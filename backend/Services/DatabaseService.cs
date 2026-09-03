@@ -118,6 +118,11 @@ BEGIN
             AND OP.Puesto = P.Puesto
             AND OP.ID_OrdenProduccion > P.Puntero_ID_OrdenProduccion
         WHERE OP.Puesto LIKE '%' + @Puesto + '%'
+          AND NOT EXISTS (
+              SELECT 1 FROM dbo.Produccion_Secuencia PS 
+              WHERE PS.ID_OrdenProduccion = OP.ID_OrdenProduccion 
+                AND PS.Puesto = P.Puesto
+          )
         ORDER BY
             OP.ID_OrdenProduccion,
             OP.Orden
@@ -213,6 +218,24 @@ BEGIN
     END CATCH;
 END;";
                 using (var cmd = new SqlCommand(createSp2, conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+
+                // 5. Auto-sync Puntero_ID_OrdenProduccion if it lags behind Produccion_Secuencia
+                string syncPointerSql = @"
+UPDATE dbo.Puesto
+SET Puntero_ID_OrdenProduccion = (
+    SELECT ISNULL(MAX(ID_OrdenProduccion), 1)
+    FROM dbo.Produccion_Secuencia
+    WHERE Puesto = dbo.Puesto.Puesto
+)
+WHERE Puntero_ID_OrdenProduccion < (
+    SELECT ISNULL(MAX(ID_OrdenProduccion), 1)
+    FROM dbo.Produccion_Secuencia
+    WHERE Puesto = dbo.Puesto.Puesto
+);";
+                using (var cmd = new SqlCommand(syncPointerSql, conn))
                 {
                     cmd.ExecuteNonQuery();
                 }
