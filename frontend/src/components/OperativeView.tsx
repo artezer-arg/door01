@@ -1,31 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
-  Database, Printer, CheckCircle, XCircle, AlertTriangle, RefreshCw, 
-  User, ShieldAlert, Cpu, HelpCircle, Volume2
+  CheckCircle, XCircle, AlertTriangle, RefreshCw, 
+  User, ShieldAlert, Volume2, Settings, FileText, Info
 } from 'lucide-react';
 
+// Toyota Boshoku Red Wings Logo
+const ToyotaBoshokuLogo: React.FC<{ height?: number }> = ({ height = 28 }) => (
+  <svg height={height} viewBox="0 0 54 36" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+    <path d="M4 25C14 25 25 18 36 7C28 9 20 13 14 17C10 20 6 23 4 25Z" fill="#E60012"/>
+    <path d="M13 28C24 28 37 18 49 6C39 8 28 13 20 20C16 23 14 26 13 28Z" fill="#E60012"/>
+    <path d="M2 30C8 30 16 28 24 24C16 26 9 28 2 30Z" fill="#E60012"/>
+  </svg>
+);
 
+// Framed QR Target Icon for Center Banner
+const QrTargetIcon: React.FC<{ size?: number }> = ({ size = 52 }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+    <path d="M6 16V10C6 7.79086 7.79086 6 10 6H16" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+    <path d="M32 6H38C40.2091 6 42 7.79086 42 10V16" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+    <path d="M6 32V38C6 40.2091 7.79086 42 10 42H16" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+    <path d="M32 42H38C40.2091 42 42 40.2091 42 38V32" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+    <rect x="14" y="14" width="7" height="7" rx="1.5" fill="white"/>
+    <rect x="27" y="14" width="7" height="7" rx="1.5" fill="white"/>
+    <rect x="14" y="27" width="7" height="7" rx="1.5" fill="white"/>
+    <rect x="27" y="27" width="4" height="4" fill="white"/>
+    <rect x="33" y="33" width="3" height="3" fill="white"/>
+    <rect x="33" y="27" width="2" height="3" fill="white"/>
+    <rect x="27" y="33" width="3" height="2" fill="white"/>
+  </svg>
+);
 
-const ControlQRCode: React.FC<{ value: string; size?: number }> = ({ value, size = 160 }) => {
+// Barcode Handheld Scanner Icon for Footer
+const BarcodeScannerIcon: React.FC<{ size?: number }> = ({ size = 26 }) => (
+  <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+    <rect x="4" y="6" width="24" height="13" rx="3" stroke="white" strokeWidth="2.5" />
+    <path d="M10 10V15M14 10V15M17 10V15M20 10V15M23 10V15" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    <path d="M11 19L9 26H23L21 19" stroke="white" strokeWidth="2.5" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Control Barcode Display Component
+const ControlQRCode: React.FC<{ value: string; size?: number }> = ({ value, size = 140 }) => {
   return (
-    <div style={{ background: '#ffffff', padding: '16px', borderRadius: '14px', display: 'inline-block', boxShadow: '0 8px 24px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.04)' }}>
+    <div style={{ background: '#ffffff', padding: '12px', borderRadius: '12px', display: 'inline-block', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
       <QRCodeSVG value={value} size={size} level="H" includeMargin={true} />
-      <div style={{ textAlign: 'center', color: '#000000', fontFamily: 'monospace', fontSize: '12px', fontWeight: 800, marginTop: '8px', letterSpacing: '1px' }}>
+      <div style={{ textAlign: 'center', color: '#0f172a', fontFamily: 'monospace', fontSize: '11px', fontWeight: 800, marginTop: '6px', letterSpacing: '1px' }}>
         {value}
       </div>
     </div>
   );
 };
 
-
-// Web Audio API Sound Generator (Self-contained, offline-safe)
+// Web Audio API Sound Generator (Offline-safe)
 const playSound = (type: 'success' | 'error') => {
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     const ctx = new AudioContextClass();
     if (type === 'success') {
-      // Clear high double beep
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       osc1.connect(gain1);
@@ -46,7 +78,6 @@ const playSound = (type: 'success' | 'error') => {
         osc2.stop(ctx.currentTime + 0.12);
       }, 120);
     } else {
-      // Low buzz warning
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sawtooth';
@@ -118,6 +149,8 @@ interface OperativeViewProps {
   refreshIntervalSec: number;
   operador: string;
   onOpenConfig: () => void;
+  onOpenHistory?: () => void;
+  onOpenDesigner?: () => void;
   mockDbError: boolean;
   setMockDbError: (val: boolean) => void;
   mockPrintFolderError: boolean;
@@ -131,6 +164,8 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
   refreshIntervalSec,
   operador,
   onOpenConfig,
+  onOpenHistory,
+  onOpenDesigner,
   mockDbError,
   setMockDbError,
   mockPrintFolderError,
@@ -154,24 +189,47 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
   // Hardware Status Indicators
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const [printerOnline, setPrinterOnline] = useState<boolean | null>(null);
-  const scannerActive = true;
 
-  // Footer Alert Bar configuration
+  // Footer & Process State
   const [footerState, setFooterState] = useState<'waiting' | 'processing' | 'approved' | 'rejected' | 'error' | 'idle'>('idle');
   const [footerText, setFooterText] = useState('INICIANDO PUESTO...');
-  const [timeStr, setTimeStr] = useState(new Date().toLocaleTimeString());
 
-  // Simulator Drawer State
+  // Clock
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Supervisor Menu Modal
+  const [showSupervisorMenu, setShowSupervisorMenu] = useState(false);
+
+  // Simulator State
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [simQrInput, setSimQrInput] = useState('');
+
+  // Auto-advance countdown timer
+  const [autoAdvanceSeconds, setAutoAdvanceSeconds] = useState<number | null>(null);
 
   // Keep ticking clock
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeStr(new Date().toLocaleTimeString());
+      setCurrentTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Format time and date
+  const timeStr = currentTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const dateStr = currentTime.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  // Map door panel image based on requested position and hand
+  const getDoorImage = (panel: Panel | null): string => {
+    const req = panel ? panel.requiereOrnamento !== false : true;
+    return req ? '/door_exploded_con.png' : '/door_exploded_sin.png';
+  };
+
+  const isLeftHand = (panel: Panel | null): boolean => {
+    if (!panel) return false;
+    const mano = (panel.mano || '').toUpperCase();
+    return mano.includes('IZQUIERDO') || mano.startsWith('I') || mano.includes('LH');
+  };
 
   // Main Polling effect to fetch the next panel
   useEffect(() => {
@@ -188,7 +246,6 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
         if (response.ok) {
           const data = await response.json();
           
-          // Normalize backend properties to standard camelCase HMI model
           const normalizedData: Panel = {
             referencia: data.referencia || data.Referencia || '',
             iD_OrdenProduccion: data.iD_OrdenProduccion !== undefined ? data.iD_OrdenProduccion : (data.ID_OrdenProduccion !== undefined ? data.ID_OrdenProduccion : 0),
@@ -207,7 +264,6 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           setCurrentPanel(normalizedData);
           setNoPanelsMessage('');
           
-          // Update visual footer to waiting for scan or no ornament
           const responseEquiv = await fetch(`${apiBaseUrl}/api/equivalence`);
           const equivalences = await responseEquiv.json();
           const match = equivalences.find((e: any) => e.codigoPanel.toUpperCase().trim() === normalizedData.referencia.toUpperCase().trim() && e.activo);
@@ -248,7 +304,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       }
     };
 
-    fetchNextPanel(); // run instantly
+    fetchNextPanel();
 
     const polling = setInterval(fetchNextPanel, refreshIntervalSec * 1000);
     return () => {
@@ -257,7 +313,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     };
   }, [puesto, refreshIntervalSec, isProcessing, validationResult, footerState]);
 
-  // Fetch installed printer status to make sure local printing service is alive
+  // Fetch installed printer status
   useEffect(() => {
     const checkPrinter = async () => {
       try {
@@ -281,7 +337,6 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     let lastKeyTime = Date.now();
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ignore if currently focused inside active config page input text area
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
         return;
@@ -290,9 +345,8 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       if (!currentPanel || isProcessing) return;
 
       const currentTime = Date.now();
-      // Wedge readers send characters extremely rapidly (under 30ms apart)
       if (currentTime - lastKeyTime > 200) {
-        rawBuffer = ''; // reset buffer if slow keypress
+        rawBuffer = '';
       }
       lastKeyTime = currentTime;
 
@@ -314,11 +368,9 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
   const handleQrScan = async (qrCode: string) => {
     if (!currentPanel || isProcessing) return;
 
-    // Normalizing QR
     const normalizedQr = qrCode.trim().replace(/\r?\n|\r/g, "");
-
-    // Intercept control commands scanned via barcode gun
     const command = normalizedQr.toUpperCase();
+
     if (command === 'CMD-NO-ORN') {
       if (currentPanel.requiereOrnamento === false && !isProcessing && !validationResult) {
         handleConfirmNoOrnament();
@@ -346,38 +398,16 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     setFooterState('processing');
     setFooterText('PROCESANDO CÓDIGO QR...');
 
-    // Clear prior states
     setValidationResult(null);
     setDuplicateUseDetails(null);
     setLabelPreview(null);
     setRemainingMinText('');
 
-    // Prepare headers to simulate printer/db failures if checked in simulator
-    const requestHeaders: HeadersInit = {
-      'Content-Type': 'application/json'
-    };
-
     try {
-      // API call to validate QR scan
       const res = await fetch(`${apiBaseUrl}/api/validation/validate-scan`, {
         method: 'POST',
-        headers: requestHeaders,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // PascalCase
-          Qr: normalizedQr,
-          PanelReference: currentPanel.referencia,
-          ID_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion,
-          ID_OrdenCliente: currentPanel.iD_OrdenCliente,
-          Orden: currentPanel.orden,
-          Secuencia: currentPanel.secuencia,
-          SD: currentPanel.sd,
-          Expr1: currentPanel.expr1,
-          Puesto: puesto,
-          Operador: operador,
-          Mano: currentPanel.mano,
-          Posicion: currentPanel.posicion,
-
-          // camelCase
           qr: normalizedQr,
           panelReference: currentPanel.referencia,
           iD_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion,
@@ -396,7 +426,6 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       if (res.ok) {
         const result = await res.json();
         
-        // If simulation of printer failure is active
         if (mockPrintFolderError && result.success) {
           setFooterState('error');
           setFooterText('ERROR DE IMPRESIÓN');
@@ -415,15 +444,21 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           setFooterText('PROCESO COMPLETADO');
           playSound('success');
           
-          // Show visual confirmation for 4 seconds then transition next
+          // Auto advance in 4s with visual countdown
+          setAutoAdvanceSeconds(4);
+          const interval = setInterval(() => {
+            setAutoAdvanceSeconds((prev) => (prev !== null && prev > 1 ? prev - 1 : null));
+          }, 1000);
+
           setTimeout(() => {
+            clearInterval(interval);
+            setAutoAdvanceSeconds(null);
             setValidationResult(null);
             setLabelPreview(null);
             setIsProcessing(false);
           }, 4000);
 
         } else {
-          // Failure handling
           playSound('error');
           if (result.validation.motivoRechazo === 'ORNAMENTO YA PROCESADO') {
             setFooterState('rejected');
@@ -446,7 +481,6 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
             setFooterState('error');
             setFooterText('ERROR DE IMPRESIÓN');
           } else if (result.dbError) {
-            // DB Save Failed but printed (Prueba 10 scenario)
             setFooterState('error');
             setFooterText('ERROR AL ACTUALIZAR SECUENCIA EN BASE DE DATOS');
           } else {
@@ -488,20 +522,6 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // PascalCase
-          PanelReference: currentPanel.referencia,
-          ID_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion,
-          ID_OrdenCliente: currentPanel.iD_OrdenCliente,
-          Orden: currentPanel.orden,
-          Secuencia: currentPanel.secuencia,
-          SD: currentPanel.sd,
-          Expr1: currentPanel.expr1,
-          Puesto: puesto,
-          Operador: operador,
-          Mano: currentPanel.mano,
-          Posicion: currentPanel.posicion,
-
-          // camelCase
           panelReference: currentPanel.referencia,
           iD_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion,
           iD_OrdenCliente: currentPanel.iD_OrdenCliente,
@@ -535,7 +555,14 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           setFooterText('PROCESO COMPLETADO');
           playSound('success');
 
+          setAutoAdvanceSeconds(4);
+          const interval = setInterval(() => {
+            setAutoAdvanceSeconds((prev) => (prev !== null && prev > 1 ? prev - 1 : null));
+          }, 1000);
+
           setTimeout(() => {
+            clearInterval(interval);
+            setAutoAdvanceSeconds(null);
             setValidationResult(null);
             setLabelPreview(null);
             setIsProcessing(false);
@@ -570,7 +597,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     }
   };
 
-  // Retry DB Pointer Advance (Prueba 10 scenario)
+  // Retry DB Pointer Advance
   const handleRetryDatabaseAdvance = async () => {
     if (!validationResult) return;
     setIsProcessing(true);
@@ -624,562 +651,849 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     setFooterText(currentPanel && currentPanel.requiereOrnamento === false ? 'ESTE PANEL NO LLEVA ORNAMENTO' : 'ESPERANDO LECTURA DE QR');
   };
 
+  // Determine state of the 5 Poka-Yoke steps
+  const getStepStatus = (stepNumber: number): 'pending' | 'loading' | 'success' | 'error' => {
+    if (isProcessing) {
+      if (stepNumber === 1) return 'loading';
+      return 'pending';
+    }
 
+    const isApprovedNoOrn = footerState === 'approved' && currentPanel?.requiereOrnamento === false;
+    if (isApprovedNoOrn) return 'success';
 
-  const getDoorLabelText = () => {
-    if (!currentPanel) return '';
-    const pos = (currentPanel.posicion || '').toUpperCase();
-    const mano = (currentPanel.mano || '').toUpperCase();
-    const reqOrn = currentPanel.requiereOrnamento !== false;
+    if (!validationResult) return 'pending';
 
-    const posStr = pos.includes('TRASERO') || pos.startsWith('T') ? 'TRASERO' : 'DELANTERO';
-    const manoStr = mano.includes('DERECHO') || mano.startsWith('D') || mano.includes('RH') ? 'DERECHO' : 'IZQUIERDO';
-    const ornStr = reqOrn ? 'CON ORNAMENTO' : 'SIN ORNAMENTO';
+    const isApproved = validationResult.resultadoGeneral === 'APROBADO';
+    const isRejected = validationResult.resultadoGeneral === 'RECHAZADO';
+    const corrOk = validationResult.resultadoCorrespondencia === 'CORRECTO' || (!validationResult.resultadoCorrespondencia && isApproved);
+    const corrFail = validationResult.resultadoCorrespondencia === 'ORNAMENTO INCORRECTO' || validationResult.motivoRechazo?.toUpperCase().includes('CORRESPONDENCIA') || validationResult.motivoRechazo?.toUpperCase().includes('INCORRECTO');
+    const curadoOk = validationResult.resultadoCurado === 'CURADO OK' || isApproved;
+    const curadoFail = validationResult.resultadoCurado === 'CURADO INSUFICIENTE' || validationResult.motivoRechazo?.toUpperCase().includes('CURADO');
+    const dupFail = !!duplicateUseDetails || validationResult.motivoRechazo?.toUpperCase().includes('DUPLICADO') || validationResult.motivoRechazo?.toUpperCase().includes('PROCESADO');
 
-    return `${posStr} ${manoStr} ${ornStr}`;
+    switch (stepNumber) {
+      case 1: // QR leído
+        return 'success';
+      case 2: // Pieza correcta
+        if (corrFail) return 'error';
+        if (corrOk || isApproved) return 'success';
+        return 'pending';
+      case 3: // Curado OK
+        if (corrFail) return 'pending';
+        if (curadoFail) return 'error';
+        if (curadoOk || isApproved) return 'success';
+        return 'pending';
+      case 4: // No duplicado
+        if (corrFail || curadoFail) return 'pending';
+        if (dupFail) return 'error';
+        if (isApproved) return 'success';
+        return isRejected ? 'pending' : 'pending';
+      case 5: // Impresión etiqueta
+        if (!isApproved) return 'pending';
+        if (validationResult.estadoImpresion === 'ERROR' || mockPrintFolderError) return 'error';
+        if (validationResult.estadoImpresion === 'COMPLETO') return 'success';
+        return 'loading';
+      default:
+        return 'pending';
+    }
   };
 
+  const stepsConfig = [
+    { number: 1, title: 'QR leído' },
+    { number: 2, title: 'Pieza correcta' },
+    { number: 3, title: 'Curado OK' },
+    { number: 4, title: 'No duplicado' },
+    { number: 5, title: 'Impresión etiqueta' }
+  ];
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', boxSizing: 'border-box', position: 'relative' }}>
+    <div className="tb-hmi-root">
       
-      {/* HEADER SECTION */}
-      <header className="card-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '16px 16px 8px 16px', padding: '14px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(37, 99, 235, 0.08)' }}>
-            <Cpu size={24} className="pulse" style={{ color: 'var(--accent-color)' }} />
+      {/* 1. INSTITUTIONAL TOP HEADER */}
+      <header className="tb-hmi-header">
+        {/* Left: Toyota Boshoku Logo & Station Identification */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <ToyotaBoshokuLogo height={32} />
+          <div style={{ marginLeft: '14px', display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '15px', fontWeight: 900, letterSpacing: '0.5px', color: '#ffffff', lineHeight: 1.1 }}>
+              TOYOTA BOSHOKU
+            </span>
+            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '1.5px', color: '#94a3b8', lineHeight: 1.2 }}>
+              ARGENTINA
+            </span>
           </div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px' }}>DL01 - ENSAMBLE DE DOOR</h1>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>INDUSTRIAL QR MATCHING SYSTEM</span>
+
+          <div style={{ height: '34px', width: '1px', background: 'rgba(255, 255, 255, 0.2)', margin: '0 20px' }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '17px', fontWeight: 900, letterSpacing: '-0.3px', color: '#ffffff', lineHeight: 1.1 }}>
+              {puesto} - ENSAMBLE DE PANEL
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '1px', color: '#38bdf8', lineHeight: 1.2 }}>
+              SISTEMA POKA-YOKE
+            </span>
           </div>
         </div>
 
-        {/* Live statuses */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600 }}>
-            <Database size={16} style={{ color: dbConnected ? '#059669' : '#dc2626' }} />
-            <span>DB: {dbConnected ? 'CONECTADA' : 'DESCONECTADA'}</span>
+        {/* Right: Live Telemetry & Statuses */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '26px' }}>
+          {/* SQL Status */}
+          <div className="tb-telemetry-badge">
+            <span style={{ 
+              width: '11px', 
+              height: '11px', 
+              borderRadius: '50%', 
+              background: dbConnected ? '#22c55e' : '#ef4444',
+              boxShadow: dbConnected ? '0 0 10px #22c55e' : '0 0 10px #ef4444',
+              display: 'inline-block' 
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>SQL</span>
+              <span style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                {dbConnected ? 'CONECTADA' : 'DESCONECTADA'}
+              </span>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600 }}>
-            <Printer size={16} style={{ color: printerOnline ? '#059669' : '#d97706' }} />
-            <span>IMPRESORA: {printerOnline ? 'ONLINE' : 'FALLA/PREVIEW'}</span>
+
+          {/* Zebra Printer Status */}
+          <div className="tb-telemetry-badge">
+            <span style={{ 
+              width: '11px', 
+              height: '11px', 
+              borderRadius: '50%', 
+              background: printerOnline ? '#22c55e' : '#f59e0b',
+              boxShadow: printerOnline ? '0 0 10px #22c55e' : '0 0 10px #f59e0b',
+              display: 'inline-block' 
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>ZEBRA</span>
+              <span style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                {printerOnline ? 'ONLINE' : 'FALLA/PREVIEW'}
+              </span>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600 }}>
-            <Volume2 size={16} style={{ color: '#059669' }} />
-            <span>AUDIO: OK</span>
+
+          {/* Audio Indicator */}
+          <div className="tb-telemetry-badge">
+            <div style={{ 
+              background: '#15803d', 
+              padding: '5px 7px', 
+              borderRadius: '8px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
+              <Volume2 size={16} color="#ffffff" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>AUDIO</span>
+              <span style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>ACTIVO</span>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid rgba(0, 0, 0, 0.08)', paddingLeft: '24px' }}>
-            <User size={18} style={{ color: 'var(--text-secondary)' }} />
-            <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)' }}>{operador}</span>
+
+          {/* Operator Badge */}
+          <div className="tb-telemetry-badge" style={{ borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: '18px' }}>
+            <div style={{ 
+              width: '28px', 
+              height: '28px', 
+              borderRadius: '50%', 
+              background: 'rgba(255,255,255,0.12)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
+              <User size={16} color="#ffffff" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>{operador}</span>
+              <span style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>TURNO 1</span>
+            </div>
           </div>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--accent-color)', width: '90px', textAlign: 'right' }}>
-            {timeStr}
+
+          {/* Large Live Digital Clock */}
+          <div style={{ borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: '18px', textAlign: 'right' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', lineHeight: 1, letterSpacing: '-0.5px' }}>
+              {timeStr}
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginTop: '2px' }}>
+              {dateStr}
+            </div>
           </div>
-          <button className="btn btn-secondary" onClick={onOpenConfig} style={{ padding: '8px 16px', fontSize: '13px' }}>
-            CONFIGURACIÓN
+
+          {/* Discreet Supervisor Gear Button */}
+          <button 
+            onClick={() => setShowSupervisorMenu(!showSupervisorMenu)}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: '8px',
+              padding: '7px 10px',
+              cursor: 'pointer',
+              color: '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+            title="Menú de Supervisión"
+          >
+            <Settings size={18} />
           </button>
         </div>
       </header>
 
-      {/* MAIN CORE PANELS */}
-      <main style={{ display: 'flex', flex: 1, gap: '16px', padding: '8px 16px', overflow: 'hidden' }}>
+      {/* 2. MAIN 3-COLUMN WORKSTATION BODY */}
+      <main className="tb-hmi-body">
         
-        {/* LEFT PANEL: Requested Panel Sequence */}
-        <section className="card-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px', boxSizing: 'border-box', height: '100%', overflow: 'hidden' }}>
-          
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexShrink: 0, zIndex: 2 }}>
-            <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Panel Solicitado</h2>
-            <span style={{ background: 'rgba(37, 99, 235, 0.1)', color: 'var(--accent-color)', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              {currentPanel ? getDoorLabelText() : 'SECUENCIA ACTIVA'}
-            </span>
+        {/* ===================================================================
+            COLUMN 1: PANEL SOLICITADO (~28%)
+           =================================================================== */}
+        <section className="tb-col-left">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
+              Panel Solicitado
+            </h2>
           </div>
 
           {currentPanel ? (
-            <div className="slide-up" style={{ flex: 1, display: 'grid', gridTemplateRows: '1fr 1fr 1.25fr', gap: '12px', marginTop: '12px', marginBottom: '12px', minHeight: 0 }}>
-              
-              {/* Row 1: Secuencia and SD */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', minHeight: 0 }}>
-                {/* Secuencia Card */}
-                <div className="indicator-accent-card">
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
-                    Secuencia
-                  </span>
-                  <strong style={{ fontSize: 'clamp(120px, 16vh, 180px)', fontWeight: 900, color: 'var(--accent-color)', lineHeight: 0.85, marginBottom: '8px' }}>
-                    {currentPanel.secuencia}
-                  </strong>
-                </div>
-
-                {/* SD Card */}
-                <div className="indicator-accent-card accent-sd">
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
-                    SD
-                  </span>
-                  <strong style={{ fontSize: 'clamp(120px, 16vh, 180px)', fontWeight: 900, color: '#059669', lineHeight: 0.85, marginBottom: '8px' }}>
-                    {currentPanel.sd || 'N/A'}
-                  </strong>
-                </div>
+            <>
+              {/* Card 1: Secuencia */}
+              <div className="tb-card" style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Secuencia
+                </span>
+                <span style={{ fontSize: 'clamp(44px, 5.5vh, 60px)', fontWeight: 900, color: '#0f172a', lineHeight: 1.05, letterSpacing: '-1px' }}>
+                  {currentPanel.secuencia.toString().padStart(4, '0')}
+                </span>
               </div>
 
-              {/* Row 2: Posicion and Mano */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', minHeight: 0 }}>
-                {/* Posicion Card */}
-                <div className="indicator-accent-card accent-posicion">
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
+              {/* Card 2: Modelo (SD) */}
+              <div className="tb-card" style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Modelo (SD)
+                </span>
+                <span style={{ fontSize: 'clamp(38px, 4.8vh, 52px)', fontWeight: 900, color: '#15803d', lineHeight: 1.05, letterSpacing: '-0.5px' }}>
+                  {currentPanel.sd || 'N/A'}
+                </span>
+              </div>
+
+              {/* Card 3: Posición y Mano */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="tb-card" style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Posición
                   </span>
-                  <strong style={{ fontSize: 'clamp(80px, 11vh, 110px)', fontWeight: 900, color: '#7c3aed', lineHeight: 0.85, marginBottom: '8px' }}>
+                  <span style={{ fontSize: 'clamp(17px, 2.2vh, 22px)', fontWeight: 900, color: '#7e22ce', textTransform: 'uppercase', lineHeight: 1.2, marginTop: '2px' }}>
                     {currentPanel.posicion || 'N/A'}
-                  </strong>
+                  </span>
                 </div>
 
-                {/* Mano Card */}
-                <div className="indicator-accent-card accent-mano">
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
+                <div className="tb-card" style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Mano
                   </span>
-                  <strong style={{ fontSize: 'clamp(80px, 11vh, 110px)', fontWeight: 900, color: '#db2777', lineHeight: 0.85, marginBottom: '8px' }}>
+                  <span style={{ fontSize: 'clamp(22px, 2.8vh, 28px)', fontWeight: 900, color: '#db2777', textTransform: 'uppercase', lineHeight: 1.2, marginTop: '2px' }}>
                     {currentPanel.mano || 'N/A'}
-                  </strong>
+                  </span>
                 </div>
               </div>
 
-              {/* Row 3: Fecha and Codigo */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', minHeight: 0 }}>
-                {/* Fecha Card */}
-                <div className="indicator-accent-card accent-fecha">
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
-                    Fecha
-                  </span>
-                  <strong style={{ fontSize: 'clamp(12px, 1.8vh, 16px)', fontWeight: 800, color: '#d97706', marginBottom: '8px' }}>
-                    {currentPanel.fechaSecuencia 
-                      ? new Date(currentPanel.fechaSecuencia).toLocaleString('es-AR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })
-                      : 'N/A'}
-                  </strong>
-                </div>
+              {/* Requested Door Panel Photograph / Exploded diagram */}
+              <div className="tb-card" style={{ flex: 1, minHeight: '120px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#ffffff' }}>
+                <img 
+                  src={getDoorImage(currentPanel)} 
+                  alt="Panel Solicitado" 
+                  style={{ 
+                    maxWidth: '100%', 
+                    maxHeight: '100%', 
+                    objectFit: 'contain', 
+                    display: 'block',
+                    transform: isLeftHand(currentPanel) ? 'scaleX(-1)' : 'none',
+                    transition: 'transform 0.3s ease'
+                  }} 
+                />
+              </div>
 
-                {/* Código Card */}
-                <div className="indicator-accent-card accent-codigo">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
-                      Código
-                    </span>
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-secondary)' }}>
-                      OP: {currentPanel.iD_OrdenProduccion}
+              {/* Card 4: Metadata Footer */}
+              <div className="tb-card" style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Part Number Panel
+                </span>
+                <span style={{ fontSize: '15px', fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>
+                  {currentPanel.referencia}
+                </span>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
+                  <div>
+                    <span style={{ fontSize: '9px', fontWeight: 800, color: '#64748b', display: 'block' }}>OP</span>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>{currentPanel.iD_OrdenProduccion}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 800, color: '#64748b', display: 'block' }}>FECHA / HORA</span>
+                    <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>
+                      {currentPanel.fechaSecuencia 
+                        ? new Date(currentPanel.fechaSecuencia).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+                          new Date(currentPanel.fechaSecuencia).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
+                        : 'N/A'}
                     </span>
                   </div>
-                  <strong style={{ fontSize: 'clamp(12px, 1.8vh, 15px)', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                    {currentPanel.referencia}
-                  </strong>
                 </div>
               </div>
-
-            </div>
+            </>
           ) : (
-            <div style={{ display: 'flex', flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+            <div className="tb-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
               {isLoadingPanel ? (
                 <>
-                  <RefreshCw className="pulse" size={48} style={{ marginBottom: '16px', color: 'var(--accent-color)' }} />
-                  <span>CONSULTANDO SECUENCIA SQL...</span>
+                  <RefreshCw className="pulse" size={44} style={{ color: '#0284c7', marginBottom: '16px' }} />
+                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>CONSULTANDO SECUENCIA SQL...</span>
                 </>
               ) : (
                 <>
-                  <ShieldAlert size={48} style={{ marginBottom: '16px', color: '#6b7280' }} />
-                  <span style={{ fontSize: '18px', fontWeight: 700, textAlign: 'center' }}>
+                  <ShieldAlert size={48} style={{ color: '#94a3b8', marginBottom: '16px' }} />
+                  <span style={{ fontWeight: 800, fontSize: '16px', color: '#475569' }}>
                     {noPanelsMessage || "SIN PANELES PENDIENTES"}
                   </span>
                 </>
               )}
             </div>
           )}
-
-          {/* Quick Scanner Listening Indicator */}
-          {currentPanel && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.03)', borderRadius: '10px', fontSize: '13px', flexShrink: 0 }}>
-              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: scannerActive ? '#059669' : '#64748b', animation: scannerActive ? 'pulse 1.5s infinite' : 'none' }}></span>
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
-                {isProcessing ? 'Lector Bloqueado mientras se procesa...' : 'Lector QR Activo (Espere disparo de pistola USB)'}
-              </span>
-            </div>
-          )}
         </section>
 
-        {/* RIGHT PANEL: Scanned Ornament Status */}
-        <section className="card-panel" style={{ flex: 1.2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflowY: 'auto' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Ornamento Escaneado</h2>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>DETALLE DE TRAZABILIDAD</span>
+
+        {/* ===================================================================
+            COLUMN 2: ESCANEAR ORNAMENTO (~42%)
+           =================================================================== */}
+        <section className="tb-col-center">
+          <h2 style={{ margin: '0 0 2px 0', fontSize: '24px', fontWeight: 900, color: '#0f172a', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>
+            Escanear Ornamento
+          </h2>
+
+          {/* DYNAMIC ACTION BANNER */}
+          <div style={{
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+            background: (() => {
+              if (footerState === 'processing') return 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)';
+              if (footerState === 'approved') return 'linear-gradient(135deg, #15803d 0%, #166534 100%)';
+              if (footerState === 'rejected' || footerState === 'error') return 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)';
+              if (currentPanel && currentPanel.requiereOrnamento === false) return 'linear-gradient(135deg, #0284c7 0%, #0f766e 100%)';
+              return 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)';
+            })(),
+            color: '#ffffff',
+            transition: 'all 0.3s ease'
+          }}>
+            {/* Top row with icon and primary message */}
+            <div style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', gap: '20px' }}>
+              {/* Dynamic Icon */}
+              {footerState === 'processing' ? (
+                <RefreshCw className="pulse" size={48} color="#ffffff" style={{ flexShrink: 0 }} />
+              ) : footerState === 'approved' ? (
+                <CheckCircle size={52} color="#ffffff" style={{ flexShrink: 0 }} />
+              ) : footerState === 'rejected' || footerState === 'error' ? (
+                <AlertTriangle size={52} color="#ffffff" style={{ flexShrink: 0 }} />
+              ) : currentPanel && currentPanel.requiereOrnamento === false ? (
+                <FileText size={48} color="#ffffff" style={{ flexShrink: 0 }} />
+              ) : (
+                <QrTargetIcon size={54} />
+              )}
+
+              <div style={{ height: '42px', width: '1px', background: 'rgba(255, 255, 255, 0.25)', flexShrink: 0 }} />
+
+              {/* Main Heading */}
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ 
+                  fontSize: 'clamp(20px, 2.8vh, 28px)', 
+                  fontWeight: 900, 
+                  letterSpacing: '0.5px', 
+                  textTransform: 'uppercase',
+                  lineHeight: 1.15 
+                }}>
+                  {(() => {
+                    if (footerState === 'processing') return 'PROCESANDO CÓDIGO QR...';
+                    if (footerState === 'approved') return 'PROCESO COMPLETADO';
+                    if (footerState === 'rejected') return (validationResult?.motivoRechazo || 'VALIDACIÓN RECHAZADA');
+                    if (footerState === 'error') return footerText;
+                    if (currentPanel && currentPanel.requiereOrnamento === false) return 'ESTE PANEL NO LLEVA ORNAMENTO';
+                    return 'ACERQUE EL QR AL ESCÁNER';
+                  })()}
+                </span>
+                {autoAdvanceSeconds !== null && (
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginTop: '2px' }}>
+                    Avanzando automáticamente en {autoAdvanceSeconds}s...
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Dynamic Requested Action (Acción Solicitada) */}
-            {currentPanel && (
-              <div className="state-indicator-card slide-up" style={{
-                marginBottom: '16px',
-                borderLeft: '4px solid ' + (() => {
-                  switch (footerState) {
-                    case 'waiting': return 'var(--accent-color)';
-                    case 'processing': return '#ea580c';
-                    case 'approved': return '#059669';
-                    case 'rejected': return '#dc2626';
-                    case 'error': return '#dc2626';
-                    case 'idle': return '#64748b';
-                    default: return 'var(--accent-color)';
-                  }
-                })(),
-                background: (() => {
-                  switch (footerState) {
-                    case 'waiting': return 'rgba(37, 99, 235, 0.04)';
-                    case 'processing': return 'rgba(234, 88, 12, 0.04)';
-                    case 'approved': return 'rgba(5, 150, 105, 0.04)';
-                    case 'rejected': return 'rgba(220, 38, 38, 0.04)';
-                    case 'error': return 'rgba(220, 38, 38, 0.04)';
-                    case 'idle': return 'rgba(100, 116, 139, 0.04)';
-                    default: return 'rgba(37, 99, 235, 0.04)';
-                  }
-                })(),
-                padding: '16px',
-                borderRadius: '12px'
-              }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px' }}>
-                  Acción Solicitada
-                </span>
-                <div style={{ 
-                  fontSize: '20px', 
-                  fontWeight: 900, 
-                  color: (() => {
-                    switch (footerState) {
-                      case 'waiting': return 'var(--accent-color)';
-                      case 'processing': return '#ea580c';
-                      case 'approved': return '#059669';
-                      case 'rejected': return '#dc2626';
-                      case 'error': return '#dc2626';
-                      case 'idle': return '#475569';
-                      default: return 'var(--text-primary)';
-                    }
-                  })(),
-                  marginTop: '4px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  {footerText}
+            {/* Subtitle description bar */}
+            <div style={{ 
+              padding: '8px 20px', 
+              background: 'rgba(0, 0, 0, 0.14)', 
+              borderTop: '1px solid rgba(255, 255, 255, 0.18)', 
+              fontSize: '13px', 
+              fontWeight: 500, 
+              color: 'rgba(255, 255, 255, 0.95)' 
+            }}>
+              {(() => {
+                if (footerState === 'processing') return 'Verificando correspondencia, tiempo de curado y duplicidad en base de datos.';
+                if (footerState === 'approved') return 'Kanban impreso correctamente. Pieza validada para ensamble.';
+                if (footerState === 'rejected') return `${remainingMinText ? remainingMinText + ' — ' : ''}Presione "Aceptar" abajo o escanee CMD-RESET para reintentar.`;
+                if (footerState === 'error') return 'Verifique la conexión de red o impresora y reintente el proceso.';
+                if (currentPanel && currentPanel.requiereOrnamento === false) return 'Presione "Confirmar Panel Sin Ornamento" o escanee CMD-NO-ORN para avanzar.';
+                return 'El sistema validará automáticamente pieza, curado y duplicado.';
+              })()}
+            </div>
+          </div>
+
+          {/* LARGE CENTRAL VISUAL DISPLAY (Photograph or Rejection Detail) */}
+          <div className="tb-card" style={{ flex: 1, minHeight: '180px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+            {validationResult && validationResult.resultadoGeneral === 'RECHAZADO' ? (
+              <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 2 }}>
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '14px' }}>
+                  <strong style={{ color: '#dc2626', fontSize: '15px', display: 'block', marginBottom: '8px' }}>
+                    DETALLES DEL RECHAZO:
+                  </strong>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
+                    <div>
+                      <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 800 }}>ORNAMENTO ESPERADO:</span>
+                      <div style={{ fontWeight: 800, color: '#0f172a' }}>{validationResult.codigoOrnamentoEsperado || 'NINGUNO'}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 800 }}>ORNAMENTO LEÍDO:</span>
+                      <div style={{ fontWeight: 800, color: '#dc2626' }}>{validationResult.codigoOrnamentoLeido || 'N/A'}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 800 }}>DURACIÓN DE CURADO:</span>
+                      <div style={{ fontWeight: 800, color: validationResult.resultadoCurado === 'CURADO INSUFICIENTE' ? '#dc2626' : '#15803d' }}>
+                        {validationResult.minutosCurado != null ? `${Math.floor(validationResult.minutosCurado / 60)} h ${validationResult.minutosCurado % 60} min` : 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 800 }}>ESTADO CURADO:</span>
+                      <div style={{ fontWeight: 800, color: validationResult.resultadoCurado === 'CURADO INSUFICIENTE' ? '#dc2626' : '#15803d' }}>
+                        {validationResult.resultadoCurado || 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {duplicateUseDetails && (
+                    <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #fecaca', fontSize: '11px', color: '#991b1b' }}>
+                      <strong>UTILIZACIÓN ANTERIOR:</strong> OP {duplicateUseDetails.ordenProduccion} | Operador: {duplicateUseDetails.operador} | Fecha: {new Date(duplicateUseDetails.fecha).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '12px' }}>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleResetForNewScan} 
+                    style={{ flex: 1, padding: '14px', fontSize: '14px', fontWeight: 800, background: '#0f172a' }}
+                  >
+                    ACEPTAR Y LEER OTRO ORNAMENTO
+                  </button>
+                  <ControlQRCode value="CMD-RESET" size={60} />
                 </div>
               </div>
-            )}
-
-            {/* Display validation result or scanned state */}
-            {validationResult ? (
-              <div className="slide-up">
-                
-                {/* Result header banner */}
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '16px', 
-                  padding: '18px', 
-                  borderRadius: '14px', 
-                  background: validationResult.resultadoGeneral === 'APROBADO' ? 'rgba(5, 150, 105, 0.08)' : 'rgba(220, 38, 38, 0.08)', 
-                  border: `1px solid ${validationResult.resultadoGeneral === 'APROBADO' ? 'rgba(5, 150, 105, 0.18)' : 'rgba(220, 38, 38, 0.18)'}`,
-                  marginBottom: '20px'
-                }}>
-                  {validationResult.resultadoGeneral === 'APROBADO' ? (
-                    <CheckCircle size={32} style={{ color: '#059669' }} />
-                  ) : (
-                    <XCircle size={32} style={{ color: '#dc2626' }} />
-                  )}
-                  <div>
-                    <strong style={{ fontSize: '18px', display: 'block', color: validationResult.resultadoGeneral === 'APROBADO' ? '#059669' : '#dc2626', fontWeight: 800 }}>
-                      {validationResult.resultadoGeneral === 'APROBADO' ? 'VALIDACIÓN APROBADA' : 'VALIDACIÓN RECHAZADA'}
-                    </strong>
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                      {validationResult.resultadoGeneral === 'APROBADO' 
-                        ? 'Kanban enviado a impresión correctamente.' 
-                        : (validationResult.motivoRechazo || 'Código no correspondiente')}
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '14px' }}>
-                  <div>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 700 }}>ORNAMENTO ESPERADO:</span>
-                    <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--text-primary)' }}>{validationResult.codigoOrnamentoEsperado || 'NINGUNO'}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 700 }}>ORNAMENTO LEÍDO:</span>
-                    <div style={{ fontWeight: 800, fontSize: '16px', color: validationResult.resultadoCorrespondencia === 'ORNAMENTO INCORRECTO' ? '#dc2626' : '#059669' }}>
-                      {validationResult.codigoOrnamentoLeido || 'N/A'}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 700 }}>INICIO DE CURADO:</span>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{validationResult.inicioCurado ? new Date(validationResult.inicioCurado).toLocaleString() : 'N/A'}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 700 }}>DURACIÓN DE CURADO:</span>
-                    <div style={{ fontWeight: 800, color: validationResult.resultadoCurado === 'CURADO INSUFICIENTE' ? '#dc2626' : '#059669' }}>
-                      {validationResult.minutosCurado != null ? `${Math.floor(validationResult.minutosCurado / 60)} h ${validationResult.minutosCurado % 60} min` : 'N/A'}
-                    </div>
-                    {remainingMinText && validationResult.resultadoCurado === 'CURADO INSUFICIENTE' && (
-                      <div style={{ color: '#dc2626', fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>
-                        ({remainingMinText})
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontSize: '11px', fontWeight: 700 }}>QR ORIGINAL:</span>
-                    <code style={{ fontSize: '12px', background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '8px', borderRadius: '8px', wordBreak: 'break-all', display: 'block', color: 'var(--text-primary)' }}>
-                      {validationResult.qrCompleto}
-                    </code>
-                  </div>
-                </div>
-
-                {/* Duplicate Details Drawer */}
-                {duplicateUseDetails && (
-                  <div style={{ marginTop: '20px', padding: '14px', background: 'rgba(220, 38, 38, 0.04)', border: '1px solid rgba(220, 38, 38, 0.12)', borderRadius: '10px', fontSize: '12px', color: 'var(--text-primary)' }}>
-                    <div style={{ fontWeight: 800, color: '#dc2626', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>DETALLES DE UTILIZACIÓN ANTERIOR:</div>
-                    <div><strong>Fecha:</strong> {new Date(duplicateUseDetails.fecha).toLocaleString()}</div>
-                    <div><strong>Puesto:</strong> {duplicateUseDetails.puesto} | <strong>Operador:</strong> {duplicateUseDetails.operador}</div>
-                    <div><strong>Panel:</strong> {duplicateUseDetails.panel} | <strong>Orden ID:</strong> {duplicateUseDetails.ordenProduccion}</div>
-                  </div>
-                )}
-
-                {/* DB pointer advance failure action (Prueba 10 retry) */}
-                {validationResult.resultadoGeneral === 'APROBADO' && validationResult.estadoImpresion === 'COMPLETO' && !validationResult.fechaAvancePuntero && (
-                  <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(234, 88, 12, 0.05)', border: '1px solid rgba(234, 88, 12, 0.18)', borderRadius: '12px', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ea580c', fontWeight: 800, marginBottom: '8px', textAlign: 'left' }}>
-                      <AlertTriangle size={20} style={{ flexShrink: 0 }} />
-                      <span>FALLÓ AVANCE DE TRANSACCIÓN EN SQL SERVER</span>
-                    </div>
-                    <p style={{ fontSize: '12px', margin: '0 0 12px 0', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 500 }}>El Kanban fue impreso, pero el puntero no pudo actualizarse. Escanea o presiona reintentar para avanzar la secuencia.</p>
-                    <button className="btn btn-primary" onClick={handleRetryDatabaseAdvance} style={{ backgroundColor: '#ea580c', width: '100%', marginBottom: '16px', color: '#fff' }}>
-                      REINTENTAR ACTUALIZAR BASE DE DATOS
-                    </button>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>O ESCANEA CÓDIGO DE CONTROL:</span>
-                      <ControlQRCode value="CMD-RETRY" />
-                    </div>
-                  </div>
-                )}
-
-                {/* Reset button for rejected scan */}
-                {validationResult.resultadoGeneral === 'RECHAZADO' && (
-                  <div style={{ marginTop: '24px', textAlign: 'center' }}>
-                    <button className="btn btn-secondary" onClick={handleResetForNewScan} style={{ width: '100%', padding: '16px', marginBottom: '16px', fontWeight: 700 }}>
-                      ACEPTAR Y LEER OTRO ORNAMENTO
-                    </button>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>O ESCANEA CÓDIGO DE CONTROL:</span>
-                      <ControlQRCode value="CMD-RESET" />
-                    </div>
-                  </div>
-                )}
-
+            ) : labelPreview ? (
+              <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  Kanban Impreso (Vista Previa)
+                </span>
+                <img 
+                  src={`data:image/png;base64,${labelPreview}`} 
+                  alt="Kanban Impreso" 
+                  style={{ maxHeight: '200px', maxWidth: '100%', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
+                />
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '350px', color: 'var(--text-secondary)' }}>
-                {isProcessing ? (
-                  <>
-                    <RefreshCw className="pulse" size={48} style={{ marginBottom: '16px', color: 'var(--accent-color)' }} />
-                    <span style={{ fontWeight: 600 }}>PROCESANDO ANÁLISIS DE BARCODE...</span>
-                  </>
-                ) : (currentPanel && currentPanel.requiereOrnamento === false) ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', width: '100%' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#059669' }}>
-                      <AlertTriangle size={36} className="pulse" />
-                      <strong style={{ fontSize: '20px', fontWeight: 900, letterSpacing: '1px' }}>CÓDIGO NO APLICA</strong>
-                    </div>
-                    <p style={{ fontSize: '13px', margin: '0 0 10px 0', maxWidth: '300px', lineHeight: '1.5', textAlign: 'center', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                      Este panel se procesa <strong style={{ color: '#059669' }}>SIN ORNAMENTO</strong>. Escanea el código de control abajo para imprimir Kanban y avanzar.
-                    </p>
-                    <ControlQRCode value="CMD-NO-ORN" />
-                    <button className="btn btn-primary btn-large" onClick={handleConfirmNoOrnament} style={{ backgroundColor: '#059669', width: '80%', padding: '12px 0', marginTop: '10px', color: '#fff' }}>
-                      CONFIRMAR PANEL SIN ORNAMENTO
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <HelpCircle size={48} style={{ marginBottom: '16px', color: '#94a3b8' }} />
-                    <span style={{ fontWeight: 600 }}>NINGÚN DISPARO DETECTADO AÚN</span>
-                    <span style={{ fontSize: '12px', marginTop: '6px', opacity: 0.8, fontWeight: 500 }}>Aproxime el ornamento a la pistola QR</span>
-                  </>
-                )}
-              </div>
+              <img 
+                src={getDoorImage(currentPanel)} 
+                alt="Ensamble Panel" 
+                style={{ 
+                  maxWidth: '96%', 
+                  maxHeight: '96%', 
+                  objectFit: 'contain', 
+                  display: 'block',
+                  transform: isLeftHand(currentPanel) ? 'scaleX(-1)' : 'none',
+                  transition: 'transform 0.3s ease'
+                }} 
+              />
             )}
           </div>
 
-          {/* QR Scan Toast Popup */}
-          {showQrForSeconds && lastScannedQr && (
-            <div className="slide-up" style={{ padding: '10px', background: 'rgba(37, 99, 235, 0.05)', border: '1px solid rgba(37, 99, 235, 0.15)', borderRadius: '10px', fontSize: '11px', marginTop: '10px' }}>
-              <span style={{ color: 'var(--accent-color)', fontWeight: 700 }}>QR LEÍDO: </span>
-              <code style={{ wordBreak: 'break-all', color: 'var(--text-primary)' }}>{lastScannedQr}</code>
+          {/* BOTTOM BLUE CALLOUT */}
+          <div style={{ 
+            background: '#e0f2fe', 
+            border: '1px solid #bae6fd', 
+            borderRadius: '10px', 
+            padding: '12px 18px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '14px' 
+          }}>
+            <div style={{ 
+              width: '28px', 
+              height: '28px', 
+              borderRadius: '50%', 
+              background: '#0284c7', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              flexShrink: 0 
+            }}>
+              <Info size={18} color="#ffffff" />
             </div>
-          )}
+            <span style={{ fontSize: '14px', fontWeight: 800, color: '#0369a1', lineHeight: 1.25 }}>
+              Verifique visualmente modelo, posición y mano antes de escanear el ornamento.
+            </span>
+          </div>
+
         </section>
 
-        {/* FLOATING PREVIEW KANBAN COMPONENT */}
-        {labelPreview && (
-          <section className="card-panel" style={{ flex: 0.8, display: 'flex', flexDirection: 'column', padding: '16px' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Kanban Impreso (Preview)</h3>
-            <div style={{ border: '1px solid rgba(0, 0, 0, 0.08)', background: '#fff', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}>
-              <img src={`data:image/png;base64,${labelPreview}`} alt="Kanban label print preview" style={{ maxWidth: '100%', height: 'auto', display: 'block', borderRadius: '6px' }} />
+
+        {/* ===================================================================
+            COLUMN 3: VALIDACIÓN AUTOMÁTICA (~30%)
+           =================================================================== */}
+        <section className="tb-col-right">
+          <div>
+            <h2 style={{ margin: '0 0 2px 0', fontSize: '18px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
+              Validación Automática
+            </h2>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              El sistema verificará en el siguiente orden:
+            </span>
+          </div>
+
+          {/* 5-STEP CHECKLIST */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+            {stepsConfig.map((step) => {
+              const status = getStepStatus(step.number);
+
+              let badgeBg = '#64748b';
+              if (status === 'loading') badgeBg = '#0284c7';
+              if (status === 'success') badgeBg = '#15803d';
+              if (status === 'error') badgeBg = '#dc2626';
+
+              let cardClass = 'tb-step-card';
+              if (status === 'loading') cardClass += ' active';
+              if (status === 'success') cardClass += ' success';
+              if (status === 'error') cardClass += ' error';
+
+              return (
+                <div key={step.number} className={cardClass}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    {/* Circle Step Number */}
+                    <div style={{ 
+                      width: '34px', 
+                      height: '34px', 
+                      borderRadius: '50%', 
+                      background: badgeBg, 
+                      color: '#ffffff', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      fontWeight: 900, 
+                      fontSize: '15px',
+                      flexShrink: 0,
+                      transition: 'background 0.3s ease'
+                    }}>
+                      {step.number}
+                    </div>
+
+                    {/* Step Name */}
+                    <span style={{ marginLeft: '14px', fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                      {step.title}
+                    </span>
+                  </div>
+
+                  {/* Right Status Indicator */}
+                  <div>
+                    {status === 'pending' && (
+                      <span style={{ fontSize: '20px', fontWeight: 900, color: '#94a3b8', letterSpacing: '2px' }}>
+                        •••
+                      </span>
+                    )}
+                    {status === 'loading' && (
+                      <RefreshCw className="pulse" size={20} color="#0284c7" />
+                    )}
+                    {status === 'success' && (
+                      <CheckCircle size={24} color="#15803d" />
+                    )}
+                    {status === 'error' && (
+                      <XCircle size={24} color="#dc2626" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* PANEL SIN ORNAMENTO ACTION CARD */}
+          <div 
+            onClick={() => {
+              if (currentPanel && currentPanel.requiereOrnamento === false && !isProcessing) {
+                handleConfirmNoOrnament();
+              }
+            }}
+            style={{
+              background: currentPanel && currentPanel.requiereOrnamento === false ? '#f0fdf4' : '#ffffff',
+              border: `1px solid ${currentPanel && currentPanel.requiereOrnamento === false ? '#86efac' : '#cbd5e1'}`,
+              borderRadius: '12px',
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              cursor: currentPanel && currentPanel.requiereOrnamento === false ? 'pointer' : 'default',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <div style={{ 
+              width: '38px', 
+              height: '38px', 
+              borderRadius: '50%', 
+              background: currentPanel && currentPanel.requiereOrnamento === false ? '#dcfce7' : '#f1f5f9', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              flexShrink: 0 
+            }}>
+              <FileText size={20} color={currentPanel && currentPanel.requiereOrnamento === false ? '#15803d' : '#64748b'} />
             </div>
-          </section>
-        )}
+
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '14px', fontWeight: 900, color: '#0f172a' }}>
+                PANEL SIN ORNAMENTO
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>
+                Escanee CMD-NO-ORN para avanzar.
+              </span>
+            </div>
+          </div>
+
+          {/* Pruebas 10 retry notice if pointer advance fails */}
+          {validationResult && validationResult.resultadoGeneral === 'APROBADO' && validationResult.estadoImpresion === 'COMPLETO' && !validationResult.fechaAvancePuntero && (
+            <div style={{ padding: '10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px' }}>
+              <strong style={{ color: '#ea580c', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                FALLÓ AVANCE EN SQL SERVER
+              </strong>
+              <button className="btn btn-primary" onClick={handleRetryDatabaseAdvance} style={{ width: '100%', fontSize: '12px', padding: '8px', background: '#ea580c' }}>
+                REINTENTAR ACTUALIZAR BD
+              </button>
+            </div>
+          )}
+
+        </section>
 
       </main>
 
-      {/* FOOTER BAR */}
-      <footer style={{
-        height: '80px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxSizing: 'border-box',
-        transition: 'all 0.3s ease',
-        boxShadow: '0 -4px 32px rgba(31, 38, 135, 0.04)',
-        background: (() => {
-          switch (footerState) {
-            case 'waiting': return 'rgba(37, 99, 235, 0.85)';
-            case 'processing': return 'rgba(217, 119, 6, 0.85)';
-            case 'approved': return 'rgba(5, 150, 105, 0.85)';
-            case 'rejected': return 'rgba(220, 38, 38, 0.85)';
-            case 'error': return 'rgba(234, 88, 12, 0.85)';
-            case 'idle': return 'rgba(71, 85, 105, 0.85)';
-            default: return 'rgba(71, 85, 105, 0.85)';
-          }
-        })(),
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.5)',
-        margin: '8px 16px 16px 16px',
-        borderRadius: '16px'
-      }}>
-        <div className={footerState === 'processing' ? 'pulse' : ''} style={{ fontSize: '28px', fontWeight: 900, letterSpacing: '2px', textShadow: '0 2px 8px rgba(0,0,0,0.15)', textAlign: 'center', color: '#fff' }}>
-          {footerText.toUpperCase()}
+      {/* 3. INDUSTRIAL FOOTER BAR */}
+      <footer className="tb-hmi-footer">
+        {/* Left: Hardware Scanner Status Block */}
+        <div style={{ 
+          background: '#15803d', 
+          height: '100%', 
+          padding: '0 24px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '14px' 
+        }}>
+          <BarcodeScannerIcon size={26} />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '14px', fontWeight: 900, letterSpacing: '0.5px', color: '#ffffff', lineHeight: 1.1 }}>
+              ESCÁNER ACTIVO
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.1 }}>
+              Listo para recibir lectura de QR
+            </span>
+          </div>
+        </div>
+
+        {/* Center: Quality Motto */}
+        <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '3px', color: '#94a3b8', textTransform: 'uppercase' }}>
+          ——— CALIDAD EN CADA ENSAMBLE ———
+        </div>
+
+        {/* Right: Institutional Name */}
+        <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '1.5px', color: '#ffffff', opacity: 0.9 }}>
+          TOYOTA BOSHOKU ARGENTINA
         </div>
       </footer>
 
-      {/* SIMULATOR SLIDEOUT (For developer testing) */}
-      {showQrSimulator && (
+      {/* SUPERVISOR MODAL MENU */}
+      {showSupervisorMenu && (
         <div style={{
-          position: 'absolute',
-          top: simulatorOpen ? '100px' : 'calc(100% - 50px)',
-          right: '24px',
-          width: '320px',
-          zIndex: 100,
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(37, 99, 235, 0.25)',
-          boxShadow: '0 20px 40px -5px rgba(0, 0, 0, 0.08)',
-          padding: '16px',
-          borderRadius: '16px',
-          transition: 'top 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          color: 'var(--text-primary)'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <strong style={{ color: 'var(--accent-color)', fontSize: '13px', letterSpacing: '1px', fontWeight: 800 }}>🖥️ MODO SIMULADOR QR</strong>
-            <button className="btn btn-secondary" onClick={() => setSimulatorOpen(!simulatorOpen)} style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '6px' }}>
-              {simulatorOpen ? 'OCULTAR' : 'MOSTRAR'}
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            width: '400px',
+            padding: '24px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <strong style={{ fontSize: '18px', color: '#0f172a' }}>Menú de Supervisión</strong>
+              <button 
+                onClick={() => setShowSupervisorMenu(false)}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '18px', fontWeight: 800, color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => { setShowSupervisorMenu(false); onOpenConfig(); }}
+                style={{ padding: '12px', justifyContent: 'flex-start', fontWeight: 700 }}
+              >
+                ⚙️ Configuración del Puesto
+              </button>
+              
+              {onOpenHistory && (
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => { setShowSupervisorMenu(false); onOpenHistory(); }}
+                  style={{ padding: '12px', justifyContent: 'flex-start', fontWeight: 700 }}
+                >
+                  📊 Logs e Historial de Ensamble
+                </button>
+              )}
+
+              {onOpenDesigner && (
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => { setShowSupervisorMenu(false); onOpenDesigner(); }}
+                  style={{ padding: '12px', justifyContent: 'flex-start', fontWeight: 700 }}
+                >
+                  🏷️ Diseñador de Etiquetas ZPL
+                </button>
+              )}
+
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => { setShowSupervisorMenu(false); setSimulatorOpen(!simulatorOpen); }}
+                style={{ padding: '12px', justifyContent: 'flex-start', fontWeight: 700 }}
+              >
+                🖥️ {simulatorOpen ? 'Ocultar' : 'Mostrar'} Simulador de QR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR SCAN POPUP TOAST */}
+      {showQrForSeconds && lastScannedQr && (
+        <div style={{
+          position: 'fixed',
+          bottom: '64px',
+          right: '24px',
+          background: '#0f172a',
+          color: '#ffffff',
+          padding: '12px 18px',
+          borderRadius: '10px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+          fontSize: '12px',
+          zIndex: 100,
+          border: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <span style={{ color: '#38bdf8', fontWeight: 800 }}>QR LEÍDO: </span>
+          <code style={{ color: '#ffffff', fontFamily: 'monospace' }}>{lastScannedQr}</code>
+        </div>
+      )}
+
+      {/* SIMULATOR SLIDEOUT (For testing/development) */}
+      {(showQrSimulator || simulatorOpen) && (
+        <div style={{
+          position: 'fixed',
+          top: '80px',
+          right: '20px',
+          width: '320px',
+          background: 'rgba(255, 255, 255, 0.98)',
+          boxShadow: '0 12px 36px rgba(0,0,0,0.18)',
+          border: '1px solid #cbd5e1',
+          borderRadius: '14px',
+          padding: '16px',
+          zIndex: 200
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <strong style={{ fontSize: '13px', color: '#0284c7' }}>🖥️ SIMULADOR QR</strong>
+            <button 
+              onClick={() => setSimulatorOpen(false)}
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 800, color: '#64748b' }}
+            >
+              ✕
             </button>
           </div>
 
-          {simulatorOpen && (
-            <div>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 12px 0', fontWeight: 500 }}>
-                Pegue o simule lecturas de códigos QR aquí. El formato por defecto del seed es:
-                <br/><code style={{ background: 'rgba(0,0,0,0.04)', color: '#059669', display: 'block', padding: '4px', margin: '4px 0', borderRadius: '6px', fontSize: '10px', border: '1px solid rgba(0,0,0,0.02)' }}>CÓDIGO_ORNAMENTO;FECHA_CURADO;SERIAL</code>
-              </p>
+          <textarea 
+            className="form-input" 
+            rows={2} 
+            value={simQrInput}
+            onChange={(e) => setSimQrInput(e.target.value)}
+            placeholder="67781-0K090;202607170600;SN998822"
+            style={{ fontSize: '12px', fontFamily: 'monospace', marginBottom: '8px' }}
+          />
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700, color: 'var(--text-secondary)' }}>Pegar código QR de prueba:</label>
-                <textarea 
-                  className="form-input" 
-                  rows={2} 
-                  value={simQrInput}
-                  onChange={(e) => setSimQrInput(e.target.value)}
-                  placeholder="67781-0K090;202607170600;SN998822"
-                  style={{ fontSize: '12px', fontFamily: 'monospace', background: 'rgba(255,255,255,0.8)' }}
-                />
-              </div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={() => { if (simQrInput) handleQrScan(simQrInput); }}
+              disabled={!currentPanel || isProcessing}
+              style={{ flex: 1, padding: '8px', fontSize: '12px' }}
+            >
+              Simular Escaneo
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setSimQrInput('')}
+              style={{ padding: '8px', fontSize: '12px' }}
+            >
+              Borrar
+            </button>
+          </div>
 
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                <button 
-                  className="btn btn-primary" 
-                  onClick={() => { if(simQrInput) handleQrScan(simQrInput); }} 
-                  disabled={!currentPanel || isProcessing}
-                  style={{ flex: 1, fontSize: '12px', padding: '8px 12px' }}
-                >
-                  Disparar Escaneo
-                </button>
-                <button 
-                  className="btn btn-secondary" 
-                  onClick={() => setSimQrInput('')} 
-                  style={{ fontSize: '12px', padding: '8px' }}
-                >
-                  Borrar
-                </button>
-              </div>
+          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px', fontSize: '11px' }}>
+            <strong style={{ display: 'block', marginBottom: '4px', color: '#ea580c' }}>Simular Fallas:</strong>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={mockPrintFolderError} 
+                onChange={(e) => setMockPrintFolderError(e.target.checked)} 
+              />
+              Error de Impresora
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={mockDbError} 
+                onChange={(e) => setMockDbError(e.target.checked)} 
+              />
+              Fallo de Base de Datos
+            </label>
+          </div>
 
-              <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '10px' }}>
-                <strong style={{ fontSize: '11px', display: 'block', marginBottom: '6px', color: '#ea580c', fontWeight: 700 }}>Simular errores de Planta:</strong>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '11px', fontWeight: 600 }}>
-                  <input 
-                    type="checkbox" 
-                    id="chkPrintErr" 
-                    checked={mockPrintFolderError} 
-                    onChange={(e) => setMockPrintFolderError(e.target.checked)} 
-                  />
-                  <label htmlFor="chkPrintErr" style={{ cursor: 'pointer', color: 'var(--text-primary)' }}>Error de Impresora (Prueba 9)</label>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', fontWeight: 600 }}>
-                  <input 
-                    type="checkbox" 
-                    id="chkDbErr" 
-                    checked={mockDbError} 
-                    onChange={(e) => setMockDbError(e.target.checked)} 
-                  />
-                  <label htmlFor="chkDbErr" style={{ cursor: 'pointer', color: 'var(--text-primary)' }}>Fallo de Base de Datos (Prueba 10)</label>
-                </div>
-              </div>
-              
-              {/* Quick Helper seeds list */}
-              {currentPanel && (
-                <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '10px', marginTop: '10px' }}>
-                  <strong style={{ fontSize: '10px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 700 }}>QR válidos según el panel solicitado:</strong>
-                  
-                  {currentPanel.referencia === '67610-0KM60-C0' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start', borderRadius: '6px' }} onClick={() => setSimQrInput("67781-0K090;202607170600;SN123456")}>
-                        ✔️ OK (Curado 4h 10m - Prueba 1)
-                      </button>
-                      <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start', borderRadius: '6px' }} onClick={() => setSimQrInput("67782-0K090;202607170600;SN123456")}>
-                        ❌ ERROR (Ornamento incorrecto - Prueba 2)
-                      </button>
-                    </div>
-                  )}
-
-                  {currentPanel.referencia === '67610-0KM70-C0' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start', borderRadius: '6px' }} onClick={() => setSimQrInput("67781-0K100;202607170611;SN123456")}>
-                        ❌ CURADO INSUFICIENTE (3h 59m - Prueba 3)
-                      </button>
-                      <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start', borderRadius: '6px' }} onClick={() => setSimQrInput("67781-0K100;202607170610;SN123456")}>
-                        ✔️ CURADO OK (4h 00m - Prueba 4)
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
+          {currentPanel && currentPanel.referencia === '67610-0KM60-C0' && (
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px' }} onClick={() => setSimQrInput("67781-0K090;202607170600;SN123456")}>
+                ✔️ Cargar QR Válido (Prueba 1)
+              </button>
+              <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px' }} onClick={() => setSimQrInput("67782-0K090;202607170600;SN123456")}>
+                ❌ Cargar QR Incorrecto (Prueba 2)
+              </button>
             </div>
           )}
         </div>
