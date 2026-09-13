@@ -54,6 +54,27 @@ namespace Backend.Controllers
             }
         }
 
+        [HttpPut("batch")]
+        public async Task<IActionResult> UpdateConfigsBatch([FromBody] System.Collections.Generic.List<UpdateConfigRequest> requests, [FromQuery] string? user = null)
+        {
+            if (requests == null || requests.Count == 0)
+            {
+                return BadRequest("La lista de configuraciones está vacía.");
+            }
+
+            try
+            {
+                string effectiveUser = user ?? requests.Find(r => !string.IsNullOrEmpty(r.User))?.User ?? "ADMIN";
+                var items = System.Linq.Enumerable.Select(requests, r => (r.Key, r.Value, r.Motivo));
+                var success = await _dbService.UpdateConfigsBatchAsync(items, effectiveUser);
+                return Ok(new { success, message = "Configuraciones actualizadas en lote correctamente." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error al actualizar lote de configuraciones.", detail = ex.Message });
+            }
+        }
+
         [HttpGet("audit")]
         public async Task<IActionResult> GetAuditLogs()
         {

@@ -55,6 +55,12 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
   const [labelHeightCm, setLabelHeightCm] = useState(7.62); // 3 inches * 2.54 = 7.62 cm
   const [labelDpi, setLabelDpi] = useState(203); // 203, 300, 600
 
+  const [originalWidth, setOriginalWidth] = useState(4);
+  const [originalHeight, setOriginalHeight] = useState(3);
+  const [originalDpi, setOriginalDpi] = useState(203);
+  const [labelHomeX, setLabelHomeX] = useState(0);
+  const [labelHomeY, setLabelHomeY] = useState(0);
+
   const labelWidth = parseFloat((labelWidthCm / 2.54).toFixed(3));
   const labelHeight = parseFloat((labelHeightCm / 2.54).toFixed(3));
 
@@ -192,11 +198,19 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
           setLabelHeightCm(parseFloat((finalHeight * 2.54).toFixed(2)));
         }
 
+        setOriginalWidth(finalWidth);
+        setOriginalHeight(finalHeight);
+        setOriginalDpi(dpi);
+
         fetchPreview(template, simData, finalWidth, finalHeight, dpi);
       }
     } catch (e) {
       console.warn("Error cargando plantilla inicial. Usando preset estándar.", e);
       setZplCode(presets.standard);
+      setOriginalZpl(presets.standard);
+      setOriginalWidth(4);
+      setOriginalHeight(3);
+      setOriginalDpi(203);
       const elements = parseZplToElements(presets.standard);
       setVisualElements(elements);
       fetchPreview(presets.standard, simData, 4, 3, 203);
@@ -223,134 +237,137 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     const elements: VisualElement[] = [];
     if (!zpl) return elements;
 
-    // Split ZPL by commands (starts with ^ or ~)
-    const commands = zpl.split(/(?=\^|~)/);
-    
-    let currentFontSize = 24;
-    let currentX = 0;
-    let currentY = 0;
+    // 1. Check for Label Home ^LHx,y if present
+    const lhMatch = zpl.match(/\^LH(\d+),(\d+)/i);
+    if (lhMatch) {
+      setLabelHomeX(parseInt(lhMatch[1], 10) || 0);
+      setLabelHomeY(parseInt(lhMatch[2], 10) || 0);
+    }
 
-    for (let i = 0; i < commands.length; i++) {
-      const cmd = commands[i].trim();
-      if (!cmd) continue;
+    let globalFontSize = 24;
 
-      // 1. Check Global Font size default: ^CF0,24
-      const cfMatch = cmd.match(/^\^CF0,(\d+)/i);
-      if (cfMatch) {
-        currentFontSize = parseInt(cfMatch[1]) || 24;
+    // Match all field blocks (^FO...^FS or ^FT...^FS) and font changes (^CF...)
+    const tokenRegex = /(\^CF[A-Z0-9]?,?\d*|\^(?:FO|FT)\d+,\d+[\s\S]*?(?=\^FS|\^FO|\^FT|\^XZ|$)(?:\^FS)?)/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = tokenRegex.exec(zpl)) !== null) {
+      const token = match[0].trim();
+      if (!token) continue;
+
+      // Global font setting ^CF0,24
+      if (token.toUpperCase().startsWith('^CF')) {
+        const cfMatch = token.match(/\^CF[A-Z0-9]?,?(\d+)/i);
+        if (cfMatch && cfMatch[1]) {
+          globalFontSize = parseInt(cfMatch[1], 10) || 24;
+        }
         continue;
       }
 
-      // 2. Check position command: ^FOx,y
-      const foMatch = cmd.match(/^\^FO(\d+),(\d+)/i);
-      if (foMatch) {
-        currentX = parseInt(foMatch[1]) || 0;
-        currentY = parseInt(foMatch[2]) || 0;
+      // Position command: ^FOx,y or ^FTx,y
+      const foMatch = token.match(/\^(FO|FT)(\d+),(\d+)/i);
+      if (!foMatch) continue;
 
-        // Check if there are chained commands in the same segment or next segment
-        // Let's merge standard chained parameters to scan inside this chunk
-        let nextSegment = cmd;
-        if (cmd === `^FO${currentX},${currentY}` && i + 1 < commands.length) {
-          // If the segment is just the position, inspect next command
-          nextSegment = commands[i + 1].trim();
-        }
+      const isFt = foMatch[1].toUpperCase() === 'FT';
+      let x = parseInt(foMatch[2], 10) || 0;
+      let y = parseInt(foMatch[3], 10) || 0;
 
-        // A. Graphic Box: ^GBw,h,t
-        const gbMatch = nextSegment.match(/\^GB(\d+),(\d+),(\d+)/i);
-        if (gbMatch) {
-          const w = parseInt(gbMatch[1]) || 10;
-          const h = parseInt(gbMatch[2]) || 10;
-          const t = parseInt(gbMatch[3]) || 2;
-          const isLine = (w <= 6 || h <= 6);
-          elements.push({
-            id: 'el_' + Math.random().toString(36).substr(2, 9),
-            type: isLine ? 'line' : 'box',
-            x: currentX,
-            y: currentY,
-            w,
-            h,
-            content: isLine ? 'Línea' : 'Caja',
-            thickness: t
-          });
-          continue;
-        }
+      // A. Graphic Box / Line: ^GBw,h,t
+      const gbMatch = token.match(/\^GB(\d+),(\d+),?(\d*)/i);
+      if (gbMatch) {
+        const w = parseInt(gbMatch[1], 10) || 10;
+        const h = parseInt(gbMatch[2], 10) || 10;
+        const t = parseInt(gbMatch[3], 10) || 2;
+        const isLine = (w <= 6 || h <= 6);
+        elements.push({
+          id: 'el_' + Math.random().toString(36).substr(2, 9),
+          type: isLine ? 'line' : 'box',
+          x,
+          y,
+          w,
+          h,
+          content: isLine ? 'Línea' : 'Caja',
+          thickness: t
+        });
+        continue;
+      }
 
-        // B. 1D Barcode: ^BCN,h,Y...
-        const bcMatch = nextSegment.match(/\^BC[A-Z0-9]?,(\d+)/i);
-        if (bcMatch) {
-          const h = parseInt(bcMatch[1]) || 60;
-          // Look for subsequent FD command to capture barcode content
-          let content = '';
-          const fdMatch = nextSegment.match(/\^FD([^^]+)\^FS/i);
-          if (fdMatch) {
-            content = fdMatch[1];
-          } else if (i + 1 < commands.length) {
-            // check if FD is in the next block
-            const fdNext = commands[i + 1].trim();
-            const fdMatchNext = fdNext.match(/^\^FD([^^]+)\^FS/i);
-            if (fdMatchNext) content = fdMatchNext[1];
+      // B. QR Code: ^BQN...
+      const bqMatch = token.match(/\^BQ[A-Z0-9]?,?(\d*)?,?(\d*)/i);
+      if (bqMatch) {
+        const scale = parseInt(bqMatch[2] || bqMatch[1], 10) || 5;
+        let content = '{QrCompleto}';
+        const fdMatch = token.match(/\^FD(?:QA,)?([\s\S]*?)(?:\^FS|$)/i);
+        if (fdMatch) content = fdMatch[1];
+        elements.push({
+          id: 'el_' + Math.random().toString(36).substr(2, 9),
+          type: 'qrcode',
+          x,
+          y,
+          w: scale * 25,
+          h: scale * 25,
+          content,
+          qrScale: scale
+        });
+        continue;
+      }
+
+      // C. 1D Barcode: ^BC...
+      const bcMatch = token.match(/\^BC[A-Z0-9]?,?(\d*)/i);
+      if (bcMatch) {
+        const h = parseInt(bcMatch[1], 10) || 60;
+        let content = '{Referencia}';
+        const fdMatch = token.match(/\^FD([\s\S]*?)(?:\^FS|$)/i);
+        if (fdMatch) content = fdMatch[1];
+        elements.push({
+          id: 'el_' + Math.random().toString(36).substr(2, 9),
+          type: 'barcode',
+          x,
+          y,
+          w: 240,
+          h,
+          content
+        });
+        continue;
+      }
+
+      // D. Text Field: ^FD...
+      const fdMatch = token.match(/\^FD([\s\S]*?)(?:\^FS|$)/i);
+      if (fdMatch) {
+        const content = fdMatch[1];
+        let fontSize = globalFontSize;
+
+        // Check for specific font size in this field e.g. ^A0N,28,28 or ^A0,40,40
+        const aMatch = token.match(/\^A[A-Z0-9]?,?[A-Z]?,?(\d+)/i);
+        if (aMatch && aMatch[1]) {
+          fontSize = parseInt(aMatch[1], 10) || globalFontSize;
+        } else {
+          const inFieldCf = token.match(/\^CF[A-Z0-9]?,?(\d+)/i);
+          if (inFieldCf && inFieldCf[1]) {
+            fontSize = parseInt(inFieldCf[1], 10) || globalFontSize;
           }
-
-          elements.push({
-            id: 'el_' + Math.random().toString(36).substr(2, 9),
-            type: 'barcode',
-            x: currentX,
-            y: currentY,
-            w: 240,
-            h,
-            content: content || '{Referencia}'
-          });
-          continue;
         }
 
-        // C. QR Code: ^BQN,2,scale
-        const bqMatch = nextSegment.match(/\^BQ[A-Z0-9]?,2,(\d+)/i);
-        if (bqMatch) {
-          const scale = parseInt(bqMatch[1]) || 5;
-          let content = '';
-          const fdMatch = nextSegment.match(/\^FDQA,([^^]+)\^FS/i);
-          if (fdMatch) {
-            content = fdMatch[1];
-          } else if (i + 1 < commands.length) {
-            const fdNext = commands[i + 1].trim();
-            const fdMatchNext = fdNext.match(/^\^FDQA,([^^]+)\^FS/i);
-            if (fdMatchNext) content = fdMatchNext[1];
-          }
-
-          elements.push({
-            id: 'el_' + Math.random().toString(36).substr(2, 9),
-            type: 'qrcode',
-            x: currentX,
-            y: currentY,
-            w: scale * 25,
-            h: scale * 25,
-            content: content || '{QrCompleto}',
-            qrScale: scale
-          });
-          continue;
+        let w = Math.max(60, Math.round(content.length * (fontSize * 0.58)));
+        const fbMatch = token.match(/\^FB(\d+)/i);
+        if (fbMatch && fbMatch[1]) {
+          w = parseInt(fbMatch[1], 10) || w;
         }
 
-        // D. Text Field: ^FDtext^FS (optionally preceeded by font size ^A0,size,size)
-        const aMatch = nextSegment.match(/\^A([A-Z0-9]),(\d+)/i);
-        let size = currentFontSize;
-        if (aMatch) {
-          size = parseInt(aMatch[2]) || currentFontSize;
+        const h = Math.round(fontSize * 1.15);
+        if (isFt) {
+          y = Math.max(0, y - fontSize);
         }
 
-        const fdMatch = nextSegment.match(/\^FD([^^]+)\^FS/i);
-        if (fdMatch) {
-          const content = fdMatch[1];
-          elements.push({
-            id: 'el_' + Math.random().toString(36).substr(2, 9),
-            type: 'text',
-            x: currentX,
-            y: currentY,
-            w: Math.max(80, content.length * (size * 0.55)),
-            h: size + 6,
-            content,
-            fontSize: size
-          });
-        }
+        elements.push({
+          id: 'el_' + Math.random().toString(36).substr(2, 9),
+          type: 'text',
+          x,
+          y,
+          w,
+          h,
+          content,
+          fontSize
+        });
       }
     }
 
@@ -361,7 +378,10 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
   const generateZplFromElements = (elements: VisualElement[]): string => {
     const dotsWidth = Math.round(labelWidth * labelDpi);
     const dotsHeight = Math.round(labelHeight * labelDpi);
-    let zpl = `^XA\n^PW${dotsWidth}\n^LL${dotsHeight}\n^LH30,20\n`;
+    let zpl = `^XA\n^PW${dotsWidth}\n^LL${dotsHeight}\n`;
+    if (labelHomeX > 0 || labelHomeY > 0) {
+      zpl += `^LH${labelHomeX},${labelHomeY}\n`;
+    }
     
     // Sort elements visually by Y, then X to write neat ZPL
     const sorted = [...elements].sort((a, b) => {
@@ -372,7 +392,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     for (const el of sorted) {
       if (el.type === 'text') {
         const size = el.fontSize || 24;
-        zpl += `^FO${el.x},${el.y}^A0,${size},${size}^FD${el.content}^FS\n`;
+        zpl += `^FO${el.x},${el.y}^A0N,${size},${size}^FD${el.content}^FS\n`;
       } else if (el.type === 'barcode') {
         zpl += `^FO${el.x},${el.y}^BCN,${el.h},Y,N,N^FD${el.content}^FS\n`;
       } else if (el.type === 'qrcode') {
@@ -655,6 +675,11 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     return zplCode;
   };
 
+  const isModified = getActiveZpl() !== originalZpl || 
+    Math.abs(labelWidth - originalWidth) > 0.01 || 
+    Math.abs(labelHeight - originalHeight) > 0.01 || 
+    labelDpi !== originalDpi;
+
   const handleExportZpl = () => {
     const zpl = getActiveZpl();
     const blob = new Blob([zpl], { type: 'text/plain;charset=utf-8' });
@@ -703,38 +728,38 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
   const handleSaveTemplate = async () => {
     setSaveStatus({ type: null, message: '' });
     const targetZpl = getActiveZpl();
+    const batchItems = [
+      { key: 'Printer_Zpl_Template', value: targetZpl, user: 'ADMIN_DISEÑO', motivo: 'Guardado unificado de etiqueta Kanban' },
+      { key: 'Printer_Label_Width_Inches', value: labelWidth.toString(), user: 'ADMIN_DISEÑO', motivo: 'Guardado unificado tamaño etiqueta' },
+      { key: 'Printer_Label_Height_Inches', value: labelHeight.toString(), user: 'ADMIN_DISEÑO', motivo: 'Guardado unificado tamaño etiqueta' },
+      { key: 'Printer_Label_DPI', value: labelDpi.toString(), user: 'ADMIN_DISEÑO', motivo: 'Guardado unificado resolución etiqueta' },
+    ];
+
     try {
-      const res = await fetch(`${apiBaseUrl}/api/config`, {
+      let res = await fetch(`${apiBaseUrl}/api/config/batch`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: 'Printer_Zpl_Template',
-          value: targetZpl,
-          user: 'ADMIN_DISEÑO',
-          motivo: 'Rediseño de etiqueta Kanban desde Diseñador Drag & Drop'
-        })
+        body: JSON.stringify(batchItems)
       });
 
-      if (res.ok) {
-        await fetch(`${apiBaseUrl}/api/config`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'Printer_Label_Width_Inches', value: labelWidth.toString(), user: 'ADMIN_DISEÑO', motivo: 'Guardado tamaño etiqueta' })
-        });
-        await fetch(`${apiBaseUrl}/api/config`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'Printer_Label_Height_Inches', value: labelHeight.toString(), user: 'ADMIN_DISEÑO', motivo: 'Guardado tamaño etiqueta' })
-        });
-        await fetch(`${apiBaseUrl}/api/config`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'Printer_Label_DPI', value: labelDpi.toString(), user: 'ADMIN_DISEÑO', motivo: 'Guardado tamaño etiqueta' })
-        });
+      // Fallback to sequential updates if batch is not supported by older API
+      if (!res.ok && res.status === 404) {
+        for (const item of batchItems) {
+          res = await fetch(`${apiBaseUrl}/api/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+          });
+        }
+      }
 
+      if (res.ok) {
         setOriginalZpl(targetZpl);
+        setOriginalWidth(labelWidth);
+        setOriginalHeight(labelHeight);
+        setOriginalDpi(labelDpi);
         setZplCode(targetZpl);
-        setSaveStatus({ type: 'success', message: '¡Diseño y configuración de etiqueta guardados correctamente!' });
+        setSaveStatus({ type: 'success', message: '¡Diseño y medidas de la etiqueta guardados y activos en producción!' });
         onConfigUpdated();
         setTimeout(() => setSaveStatus({ type: null, message: '' }), 4000);
       } else {
@@ -754,35 +779,33 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     setPrintStatus({ type: null, message: 'Preparando e imprimiendo...' });
 
     const targetZpl = getActiveZpl();
+    const batchItems = [
+      { key: 'Printer_Zpl_Template', value: targetZpl, user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' },
+      { key: 'Printer_Label_Width_Inches', value: labelWidth.toString(), user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' },
+      { key: 'Printer_Label_Height_Inches', value: labelHeight.toString(), user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' },
+      { key: 'Printer_Label_DPI', value: labelDpi.toString(), user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' },
+    ];
+
     try {
       // Save temporarily to run print job
-      await fetch(`${apiBaseUrl}/api/config`, {
+      await fetch(`${apiBaseUrl}/api/config/batch`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'Printer_Zpl_Template', value: targetZpl, user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' })
+        body: JSON.stringify(batchItems)
+      }).catch(async () => {
+        for (const item of batchItems) {
+          await fetch(`${apiBaseUrl}/api/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+          });
+        }
       });
-      await fetch(`${apiBaseUrl}/api/config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'Printer_Label_Width_Inches', value: labelWidth.toString(), user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' })
-      });
-      await fetch(`${apiBaseUrl}/api/config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'Printer_Label_Height_Inches', value: labelHeight.toString(), user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' })
-      });
-      const saveOk = await fetch(`${apiBaseUrl}/api/config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'Printer_Label_DPI', value: labelDpi.toString(), user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' })
-      });
-
-      if (!saveOk.ok) {
-        setPrintStatus({ type: 'error', message: 'No se pudo guardar la plantilla para la prueba.' });
-        return;
-      }
 
       setOriginalZpl(targetZpl);
+      setOriginalWidth(labelWidth);
+      setOriginalHeight(labelHeight);
+      setOriginalDpi(labelDpi);
       setZplCode(targetZpl);
       onConfigUpdated();
 
@@ -984,17 +1007,22 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
           
           <button 
             onClick={handleSaveTemplate} 
-            disabled={getActiveZpl() === originalZpl}
             className="btn btn-primary" 
             style={{ 
               padding: '8px 16px', 
               fontSize: '13px',
-              opacity: getActiveZpl() === originalZpl ? 0.6 : 1,
-              cursor: getActiveZpl() === originalZpl ? 'default' : 'pointer'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: isModified ? 'var(--accent-color)' : '#059669',
+              boxShadow: isModified ? '0 2px 8px rgba(37, 99, 235, 0.3)' : '0 2px 8px rgba(5, 150, 105, 0.2)',
+              cursor: 'pointer',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
+            title={isModified ? 'Guardar los cambios en base de datos y activar en producción' : 'Diseño guardado y en vigencia'}
           >
-            <Save size={14} />
-            Guardar Diseño
+            {isModified ? <Save size={14} /> : <CheckCircle2 size={14} />}
+            {isModified ? 'Guardar Diseño' : 'Diseño Activo'}
           </button>
         </div>
       </header>
@@ -1139,7 +1167,8 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                       position: 'absolute',
                       left: `${el.x}px`,
                       top: `${el.y}px`,
-                      width: `${el.w}px`,
+                      width: el.type === 'text' ? 'max-content' : `${el.w}px`,
+                      minWidth: el.type === 'text' ? `${el.w}px` : undefined,
                       height: `${el.h}px`,
                       boxSizing: 'border-box',
                       cursor: 'move',
@@ -1147,18 +1176,20 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                       alignItems: 'center',
                       border: isSelected ? '2px solid #2563eb' : '1px dashed transparent',
                       boxShadow: isSelected ? '0 0 10px rgba(37,99,235,0.4)' : 'none',
-                      zIndex: isSelected ? 100 : 10
+                      zIndex: isSelected ? 100 : 10,
+                      userSelect: 'none'
                     };
 
                     if (el.type === 'text') {
                       innerNode = (
                         <span style={{ 
                           fontSize: `${el.fontSize || 24}px`, 
-                          fontFamily: 'monospace', 
-                          fontWeight: 'bold',
-                          color: '#000',
+                          fontFamily: 'Arial, sans-serif', 
+                          fontWeight: 700,
+                          color: '#000000',
                           whiteSpace: 'nowrap',
-                          lineHeight: 1
+                          lineHeight: 1,
+                          letterSpacing: '0px'
                         }}>
                           {getSimulatedText(el.content)}
                         </span>
@@ -1199,10 +1230,17 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                         </div>
                       );
                     } else if (el.type === 'box') {
-                      elementStyle.border = `${el.thickness || 2}px solid #000`;
+                      const isFilled = (el.thickness || 2) >= (el.h || 10) || (el.thickness || 2) >= (el.w || 10);
+                      if (isFilled) {
+                        elementStyle.backgroundColor = '#000000';
+                        elementStyle.border = 'none';
+                      } else {
+                        elementStyle.border = `${el.thickness || 2}px solid #000000`;
+                        elementStyle.backgroundColor = 'transparent';
+                      }
                       innerNode = null;
                     } else if (el.type === 'line') {
-                      elementStyle.backgroundColor = '#000';
+                      elementStyle.backgroundColor = '#000000';
                       elementStyle.border = 'none';
                       innerNode = null;
                     }
@@ -1433,17 +1471,39 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                   {/* Specific fields depending on type */}
                   {selectedElement.type === 'text' && (
                     <div className="form-group" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '10px', marginBottom: '2px' }}>Tamaño de Fuente:</label>
-                      <select
-                        className="form-input"
-                        style={{ padding: '6px 10px', fontSize: '12px' }}
-                        value={selectedElement.fontSize || 24}
-                        onChange={(e) => updateSelectedElement({ fontSize: parseInt(e.target.value) })}
-                      >
-                        {[12, 16, 20, 24, 28, 32, 36, 40, 48, 60].map(s => (
-                          <option key={s} value={s}>{s} px</option>
-                        ))}
-                      </select>
+                      <label style={{ fontSize: '10px', marginBottom: '2px' }}>Tamaño de Fuente (px / dots ZPL):</label>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <input 
+                          type="number" 
+                          min="8"
+                          max="150"
+                          className="form-input" 
+                          style={{ padding: '6px 10px', fontSize: '12px', width: '80px' }}
+                          value={selectedElement.fontSize || 24} 
+                          onChange={(e) => updateSelectedElement({ fontSize: parseInt(e.target.value) || 24 })} 
+                        />
+                        <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                          {[16, 20, 24, 28, 32, 40, 48].map(s => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => updateSelectedElement({ fontSize: s })}
+                              style={{
+                                padding: '3px 6px',
+                                fontSize: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(0,0,0,0.1)',
+                                background: (selectedElement.fontSize || 24) === s ? '#2563eb' : 'rgba(0,0,0,0.05)',
+                                color: (selectedElement.fontSize || 24) === s ? '#ffffff' : 'var(--text-primary)',
+                                cursor: 'pointer',
+                                fontWeight: 700
+                              }}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
 

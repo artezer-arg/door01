@@ -81,6 +81,27 @@ namespace Backend.Services
         private static DateTime _lastConnectionCheck = DateTime.MinValue;
         private static readonly object _checkLock = new object();
 
+        private const string DefaultStandardTemplate = @"^XA
+^LH30,20
+^FO10,10^GB560,410,4^FS
+^CF0,24
+^FO30,30^FDETIQUETA KANBAN - PUESTO: {Puesto}^FS
+^FO10,65^GB560,2,2^FS
+^CF0,40
+^FO35,90^FD{Referencia}^FS
+^CF0,26
+^FO35,160^FDORNAMENTO: {Ornamento}^FS
+^FO10,210^GB560,2,2^FS
+^CF0,24
+^FO35,230^FDOrden Prod: {OrdenProduccion}^FS
+^FO260,230^FDCliente: {OrdenCliente}^FS
+^FO35,275^FDSecuencia: {Secuencia}^FS
+^FO260,275^FDModelo: {SD}^FS
+^FO35,320^FDMano/Pos: {Mano}^FS
+^FO35,365^FDCurado: {MinutosCurado} min^FS
+^FO420,230^BQN,2,6^FDQA,{QrCompleto}^FS
+^XZ";
+
         public PrintingService(IDatabaseService dbService)
         {
             _dbService = dbService;
@@ -119,6 +140,10 @@ namespace Backend.Services
             string printerIp = mergedConfig.GetValueOrDefault("Printer_IP", "192.168.1.100");
             int printerPort = int.Parse(mergedConfig.GetValueOrDefault("Printer_Port", "9100"));
             string zplTemplate = mergedConfig.GetValueOrDefault("Printer_Zpl_Template", "");
+            if (string.IsNullOrWhiteSpace(zplTemplate))
+            {
+                zplTemplate = DefaultStandardTemplate;
+            }
             int copies = int.Parse(mergedConfig.GetValueOrDefault("Print_Copies", "1"));
 
             if (copies <= 0) copies = 1;

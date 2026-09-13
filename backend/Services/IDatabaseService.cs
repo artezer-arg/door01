@@ -17,6 +17,7 @@ namespace Backend.Services
         Task<string> GetConfigValueAsync(string key, string defaultValue = "");
         Task<Dictionary<string, string>> GetConfigsAsync();
         Task<bool> UpdateConfigValueAsync(string key, string value, string user, string? motivo);
+        Task<bool> UpdateConfigsBatchAsync(IEnumerable<(string Key, string Value, string? Motivo)> items, string user);
         Task<IEnumerable<AuditConfig>> GetConfigAuditsAsync();
         Task<bool> CheckQrProcessedAsync(string qr);
         Task<Validacion?> GetPriorValidationByQrAsync(string qr);

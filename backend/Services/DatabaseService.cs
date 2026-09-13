@@ -458,6 +458,50 @@ WHERE Puntero_ID_OrdenProduccion < (
             }
         }
 
+        public async Task<bool> UpdateConfigsBatchAsync(IEnumerable<(string Key, string Value, string? Motivo)> items, string user)
+        {
+            using var conn = GetConnection();
+            await conn.OpenAsync();
+            using var transaction = conn.BeginTransaction();
+            try
+            {
+                foreach (var (key, value, motivo) in items)
+                {
+                    if (string.IsNullOrWhiteSpace(key)) continue;
+
+                    string selectSql = "SELECT Valor FROM dbo.Configuracion_Sistema WITH (UPDLOCK, HOLDLOCK) WHERE Clave = @Key;";
+                    var oldValue = await conn.QueryFirstOrDefaultAsync<string>(selectSql, new { Key = key }, transaction);
+
+                    string updateSql = @"
+                        UPDATE dbo.Configuracion_Sistema 
+                        SET Valor = @Value, FechaModificacion = GETDATE(), UsuarioModificacion = @User
+                        WHERE Clave = @Key;";
+                    var rows = await conn.ExecuteAsync(updateSql, new { Key = key, Value = value, User = user }, transaction);
+
+                    if (rows == 0)
+                    {
+                        string insertSql = @"
+                            INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion, FechaModificacion, UsuarioModificacion)
+                            VALUES (@Key, @Value, 'Configuracion dinámica', GETDATE(), @User);";
+                        await conn.ExecuteAsync(insertSql, new { Key = key, Value = value, User = user }, transaction);
+                    }
+
+                    string auditSql = @"
+                        INSERT INTO dbo.Auditoria_Configuracion (Clave, ValorAnterior, ValorNuevo, FechaModificacion, UsuarioModificacion, Motivo)
+                        VALUES (@Key, @OldValue, @Value, GETDATE(), @User, @Motivo);";
+                    await conn.ExecuteAsync(auditSql, new { Key = key, OldValue = oldValue, Value = value, User = user, Motivo = motivo }, transaction);
+                }
+
+                transaction.Commit();
+                return true;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+
         public async Task<IEnumerable<AuditConfig>> GetConfigAuditsAsync()
         {
             using var conn = GetConnection();

@@ -274,6 +274,7 @@ function App() {
             apiBaseUrl={apiBaseUrl}
             onClose={() => setViewMode('OPERATIVE')}
             onConfigUpdated={reloadFromDbConfig}
+            onOpenDesigner={() => setViewMode('DESIGNER')}
           />
         )}
 

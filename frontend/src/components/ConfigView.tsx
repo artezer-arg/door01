@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, Edit2, CheckCircle2, Settings, KeyRound } from 'lucide-react';
+import { Save, Plus, Trash2, Edit2, CheckCircle2, Settings, KeyRound, Palette } from 'lucide-react';
 
 interface Equivalencia {
   id_Equivalencia: number;
@@ -23,9 +23,10 @@ interface ConfigViewProps {
   apiBaseUrl: string;
   onClose: () => void;
   onConfigUpdated: () => void;
+  onOpenDesigner?: () => void;
 }
 
-export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onConfigUpdated }) => {
+export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onConfigUpdated, onOpenDesigner }) => {
   // Authentication
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -52,7 +53,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
   const [printerName, setPrinterName] = useState('');
   const [printerIp, setPrinterIp] = useState('192.168.1.100');
   const [printerPort, setPrinterPort] = useState('9100');
-  const [printerZplTemplate, setPrinterZplTemplate] = useState('');
+  const [labelDimensions, setLabelDimensions] = useState({ width: '4', height: '3', dpi: '203' });
   const [printerList, setPrinterList] = useState<string[]>([]);
   const [simulatorEnabled, setSimulatorEnabled] = useState(false);
   const [showQrSimulator, setShowQrSimulator] = useState(false);
@@ -160,7 +161,11 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
         setPrinterMode(data.Printer_Mode || 'Spooler');
         setPrinterIp(data.Printer_IP || '192.168.1.100');
         setPrinterPort(data.Printer_Port || '9100');
-        setPrinterZplTemplate(data.Printer_Zpl_Template || '');
+        setLabelDimensions({
+          width: data.Printer_Label_Width_Inches || '4',
+          height: data.Printer_Label_Height_Inches || '3',
+          dpi: data.Printer_Label_DPI || '203'
+        });
         setSimulatorEnabled(data.Printer_Simulator_Enabled === 'true');
         setShowQrSimulator(data.Show_QR_Simulator === 'true');
         setQrParseType(data.Qr_Parse_Type || 'Separator');
@@ -258,7 +263,6 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
     success = success && await handleSaveConfig('Printer_Mode', printerMode, 'Configuración de modo de conexión de impresora');
     success = success && await handleSaveConfig('Printer_IP', printerIp, 'Configuración de dirección IP de impresora');
     success = success && await handleSaveConfig('Printer_Port', printerPort, 'Configuración de puerto TCP de impresora');
-    success = success && await handleSaveConfig('Printer_Zpl_Template', printerZplTemplate, 'Configuración de plantilla de diseño ZPL');
     
     // Parser Settings
     success = success && await handleSaveConfig('Qr_Parse_Type', qrParseType, 'Configuración tipo de parseo QR');
@@ -629,19 +633,55 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
                 </>
               )}
 
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Plantilla ZPL de Diseño del Kanban:</span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Variables: &#123;Referencia&#125;, &#123;Puesto&#125;, &#123;Secuencia&#125;, &#123;MinutosCurado&#125;, &#123;QrCompleto&#125;</span>
-                </label>
-                <textarea 
-                  className="form-input" 
-                  rows={8} 
-                  value={printerZplTemplate} 
-                  onChange={(e) => setPrinterZplTemplate(e.target.value)} 
-                  style={{ fontFamily: 'monospace', fontSize: '12px', resize: 'vertical' }}
-                  placeholder="^XA..."
-                />
+              {/* UNIFIED LABEL DESIGN INFO CARD */}
+              <div style={{ 
+                gridColumn: 'span 2', 
+                padding: '16px 20px', 
+                backgroundColor: 'rgba(37, 99, 235, 0.04)', 
+                border: '1px solid rgba(37, 99, 235, 0.2)', 
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+                marginTop: '4px'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--accent-color)' }}>
+                      🏷️ Diseño y Formato de Etiqueta Kanban
+                    </span>
+                    <span style={{ 
+                      fontSize: '10px', 
+                      padding: '2px 8px', 
+                      borderRadius: '6px', 
+                      backgroundColor: '#059669', 
+                      color: '#ffffff', 
+                      fontWeight: 800,
+                      letterSpacing: '0.5px' 
+                    }}>
+                      UNIFICADO
+                    </span>
+                  </div>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500, lineHeight: '1.4' }}>
+                    El diseño visual, la plantilla ZPL, las medidas físicas y la resolución (DPI) de la etiqueta se gestionan y guardan exclusivamente desde el <strong>Diseñador de Etiquetas</strong> para garantizar una única fuente de verdad y evitar desincronizaciones.
+                  </p>
+                  <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    <span>📐 Tamaño: <strong>{(parseFloat(labelDimensions.width) * 2.54).toFixed(1)} cm × {(parseFloat(labelDimensions.height) * 2.54).toFixed(1)} cm ({labelDimensions.width}" × {labelDimensions.height}")</strong></span>
+                    <span>⚡ Resolución: <strong>{labelDimensions.dpi} DPI</strong></span>
+                  </div>
+                </div>
+                {onOpenDesigner && (
+                  <button 
+                    type="button" 
+                    className="btn btn-primary" 
+                    onClick={onOpenDesigner}
+                    style={{ whiteSpace: 'nowrap', padding: '10px 18px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
+                  >
+                    <Palette size={16} />
+                    Ir al Diseñador
+                  </button>
+                )}
               </div>
               <div className="form-group" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <input 
