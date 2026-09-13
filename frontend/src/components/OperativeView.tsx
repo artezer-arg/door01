@@ -856,81 +856,65 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           </div>
 
           {currentPanel ? (
-            <>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '12px', minHeight: 0 }}>
               {/* Card 1: Secuencia */}
-              <div className="tb-card" style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div className="tb-card" style={{ flex: 1.1, padding: '12px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
                   Secuencia
                 </span>
-                <span style={{ fontSize: 'clamp(44px, 5.5vh, 60px)', fontWeight: 900, color: '#0f172a', lineHeight: 1.05, letterSpacing: '-1px' }}>
+                <span style={{ fontSize: 'clamp(56px, 7.5vh, 92px)', fontWeight: 900, color: '#0f172a', lineHeight: 1, letterSpacing: '-1.5px' }}>
                   {currentPanel.secuencia.toString().padStart(4, '0')}
                 </span>
               </div>
 
               {/* Card 2: Modelo (SD) */}
-              <div className="tb-card" style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div className="tb-card" style={{ flex: 1.1, padding: '12px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
                   Modelo (SD)
                 </span>
-                <span style={{ fontSize: 'clamp(38px, 4.8vh, 52px)', fontWeight: 900, color: '#15803d', lineHeight: 1.05, letterSpacing: '-0.5px' }}>
+                <span style={{ fontSize: 'clamp(48px, 6.5vh, 78px)', fontWeight: 900, color: '#15803d', lineHeight: 1, letterSpacing: '-0.5px' }}>
                   {currentPanel.sd || 'N/A'}
                 </span>
               </div>
 
               {/* Card 3: Posición y Mano */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div className="tb-card" style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', flex: 1 }}>
+                <div className="tb-card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
                     Posición
                   </span>
-                  <span style={{ fontSize: 'clamp(17px, 2.2vh, 22px)', fontWeight: 900, color: '#7e22ce', textTransform: 'uppercase', lineHeight: 1.2, marginTop: '2px' }}>
+                  <span style={{ fontSize: 'clamp(26px, 3.8vh, 42px)', fontWeight: 900, color: '#7e22ce', textTransform: 'uppercase', lineHeight: 1.1 }}>
                     {currentPanel.posicion || 'N/A'}
                   </span>
                 </div>
 
-                <div className="tb-card" style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div className="tb-card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
                     Mano
                   </span>
-                  <span style={{ fontSize: 'clamp(22px, 2.8vh, 28px)', fontWeight: 900, color: '#db2777', textTransform: 'uppercase', lineHeight: 1.2, marginTop: '2px' }}>
+                  <span style={{ fontSize: 'clamp(32px, 4.8vh, 54px)', fontWeight: 900, color: '#db2777', textTransform: 'uppercase', lineHeight: 1.1 }}>
                     {currentPanel.mano || 'N/A'}
                   </span>
                 </div>
               </div>
 
-              {/* Requested Door Panel Photograph / Exploded diagram */}
-              <div className="tb-card" style={{ flex: 1, minHeight: '120px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#ffffff' }}>
-                <img 
-                  src={getDoorImage(currentPanel)} 
-                  alt="Panel Solicitado" 
-                  style={{ 
-                    maxWidth: '100%', 
-                    maxHeight: '100%', 
-                    objectFit: 'contain', 
-                    display: 'block',
-                    transform: isLeftHand(currentPanel) ? 'scaleX(-1)' : 'none',
-                    transition: 'transform 0.3s ease'
-                  }} 
-                />
-              </div>
-
               {/* Card 4: Metadata Footer */}
-              <div className="tb-card" style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div className="tb-card" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Part Number Panel
                 </span>
-                <span style={{ fontSize: '15px', fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: '17px', fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>
                   {currentPanel.referencia}
                 </span>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #f1f5f9' }}>
                   <div>
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: '#64748b', display: 'block' }}>OP</span>
-                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>{currentPanel.iD_OrdenProduccion}</span>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block' }}>OP</span>
+                    <span style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>{currentPanel.iD_OrdenProduccion}</span>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: '#64748b', display: 'block' }}>FECHA / HORA</span>
-                    <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block' }}>FECHA / HORA</span>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>
                       {currentPanel.fechaSecuencia 
                         ? new Date(currentPanel.fechaSecuencia).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
                           new Date(currentPanel.fechaSecuencia).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -939,7 +923,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <div className="tb-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
               {isLoadingPanel ? (
