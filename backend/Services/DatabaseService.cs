@@ -93,6 +93,61 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    -- Si el puesto consultado es DL01, sincronizar y avanzar puntero si DL02 ya procesó el panel
+    IF UPPER(LTRIM(RTRIM(@Puesto))) = 'DL01' OR UPPER(@Puesto) LIKE '%DL01%'
+    BEGIN
+        DECLARE @MaxDL01 INT = 0;
+
+        SELECT @MaxDL01 = ISNULL(MAX(OP1.ID_OrdenProduccion), 0)
+        FROM dbo.Orden_Produccion OP1
+        WHERE UPPER(LTRIM(RTRIM(OP1.Puesto))) = 'DL01'
+          AND (
+              EXISTS (
+                  SELECT 1 
+                  FROM dbo.Produccion_Secuencia PS
+                  WHERE UPPER(LTRIM(RTRIM(PS.Puesto))) = 'DL02'
+                    AND PS.ID_OrdenProduccion = OP1.ID_OrdenProduccion
+              )
+              OR EXISTS (
+                  SELECT 1 
+                  FROM dbo.Produccion_Secuencia PS
+                  INNER JOIN dbo.Orden_Produccion OP2 
+                      ON PS.ID_OrdenProduccion = OP2.ID_OrdenProduccion
+                  WHERE UPPER(LTRIM(RTRIM(PS.Puesto))) = 'DL02'
+                    AND UPPER(LTRIM(RTRIM(OP2.Puesto))) = 'DL02'
+                    AND OP2.ID_OrdenCliente = OP1.ID_OrdenCliente
+                    AND OP2.Orden = OP1.Orden
+              )
+              OR EXISTS (
+                  SELECT 1 
+                  FROM dbo.Produccion_Secuencia PS
+                  WHERE UPPER(LTRIM(RTRIM(PS.Puesto))) = 'DL02'
+                    AND PS.ID_OrdenCliente = OP1.ID_OrdenCliente
+                    AND PS.Orden = OP1.Orden
+              )
+          );
+
+        IF @MaxDL01 > 0
+        BEGIN
+            UPDATE dbo.Puesto
+            SET Puntero_ID_OrdenProduccion = @MaxDL01,
+                Fecha_Puntero = GETDATE()
+            WHERE UPPER(LTRIM(RTRIM(Puesto))) = 'DL01'
+              AND Puntero_ID_OrdenProduccion < @MaxDL01;
+
+            INSERT INTO dbo.Produccion_Secuencia (ID_OrdenProduccion, ID_OrdenCliente, Puesto, Fecha, Orden, Resultado)
+            SELECT OP1.ID_OrdenProduccion, OP1.ID_OrdenCliente, 'DL01', GETDATE(), OP1.Orden, 'AUTO_DL02'
+            FROM dbo.Orden_Produccion OP1
+            WHERE UPPER(LTRIM(RTRIM(OP1.Puesto))) = 'DL01'
+              AND OP1.ID_OrdenProduccion <= @MaxDL01
+              AND NOT EXISTS (
+                  SELECT 1 FROM dbo.Produccion_Secuencia PS1
+                  WHERE PS1.ID_OrdenProduccion = OP1.ID_OrdenProduccion
+                    AND UPPER(LTRIM(RTRIM(PS1.Puesto))) = 'DL01'
+              );
+        END;
+    END;
+
     WITH Consulta_Principal AS
     (
         SELECT TOP (1)
@@ -122,6 +177,24 @@ BEGIN
               SELECT 1 FROM dbo.Produccion_Secuencia PS 
               WHERE PS.ID_OrdenProduccion = OP.ID_OrdenProduccion 
                 AND PS.Puesto = P.Puesto
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM dbo.Produccion_Secuencia PS_DL02
+              WHERE UPPER(LTRIM(RTRIM(PS_DL02.Puesto))) = 'DL02'
+                AND (
+                    PS_DL02.ID_OrdenProduccion = OP.ID_OrdenProduccion
+                    OR EXISTS (
+                        SELECT 1 FROM dbo.Orden_Produccion OP2
+                        WHERE OP2.ID_OrdenProduccion = PS_DL02.ID_OrdenProduccion
+                          AND UPPER(LTRIM(RTRIM(OP2.Puesto))) = 'DL02'
+                          AND OP2.ID_OrdenCliente = OP.ID_OrdenCliente
+                          AND OP2.Orden = OP.Orden
+                    )
+                    OR (
+                        PS_DL02.ID_OrdenCliente = OP.ID_OrdenCliente
+                        AND PS_DL02.Orden = OP.Orden
+                    )
+                )
           )
         ORDER BY
             OP.ID_OrdenProduccion,
@@ -234,7 +307,45 @@ WHERE Puntero_ID_OrdenProduccion < (
     SELECT ISNULL(MAX(ID_OrdenProduccion), 1)
     FROM dbo.Produccion_Secuencia
     WHERE Puesto = dbo.Puesto.Puesto
-);";
+);
+
+-- Sincronizar DL01 si DL02 ya procesó órdenes
+UPDATE P
+SET P.Puntero_ID_OrdenProduccion = DL02Procesado.MaxID,
+    P.Fecha_Puntero = GETDATE()
+FROM dbo.Puesto P
+CROSS APPLY (
+    SELECT ISNULL(MAX(OP1.ID_OrdenProduccion), P.Puntero_ID_OrdenProduccion) AS MaxID
+    FROM dbo.Orden_Produccion OP1
+    WHERE UPPER(LTRIM(RTRIM(OP1.Puesto))) = 'DL01'
+      AND (
+          EXISTS (
+              SELECT 1 
+              FROM dbo.Produccion_Secuencia PS
+              WHERE UPPER(LTRIM(RTRIM(PS.Puesto))) = 'DL02'
+                AND PS.ID_OrdenProduccion = OP1.ID_OrdenProduccion
+          )
+          OR EXISTS (
+              SELECT 1 
+              FROM dbo.Produccion_Secuencia PS
+              INNER JOIN dbo.Orden_Produccion OP2 
+                  ON PS.ID_OrdenProduccion = OP2.ID_OrdenProduccion
+              WHERE UPPER(LTRIM(RTRIM(PS.Puesto))) = 'DL02'
+                AND UPPER(LTRIM(RTRIM(OP2.Puesto))) = 'DL02'
+                AND OP2.ID_OrdenCliente = OP1.ID_OrdenCliente
+                AND OP2.Orden = OP1.Orden
+          )
+          OR EXISTS (
+              SELECT 1 
+              FROM dbo.Produccion_Secuencia PS
+              WHERE UPPER(LTRIM(RTRIM(PS.Puesto))) = 'DL02'
+                AND PS.ID_OrdenCliente = OP1.ID_OrdenCliente
+                AND PS.Orden = OP1.Orden
+          )
+      )
+) AS DL02Procesado
+WHERE UPPER(LTRIM(RTRIM(P.Puesto))) = 'DL01'
+  AND DL02Procesado.MaxID > P.Puntero_ID_OrdenProduccion;";
                 using (var cmd = new SqlCommand(syncPointerSql, conn))
                 {
                     cmd.ExecuteNonQuery();

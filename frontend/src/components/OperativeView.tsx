@@ -236,12 +236,12 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     let active = true;
 
     const fetchNextPanel = async () => {
-      if (isProcessing || validationResult || footerState === 'error' || footerState === 'rejected') return;
-      setIsLoadingPanel(true);
+      if (isProcessing || autoAdvanceSeconds !== null) return;
+      
       try {
         const response = await fetch(`${apiBaseUrl}/api/sequence/next?puesto=${puesto}`);
-        setDbConnected(true);
         if (!active) return;
+        setDbConnected(true);
         
         if (response.ok) {
           const data = await response.json();
@@ -261,39 +261,54 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
             requiereOrnamento: data.requiereOrnamento !== undefined ? data.requiereOrnamento : (data.RequiereOrnamento !== undefined ? data.RequiereOrnamento : true)
           };
 
-          setCurrentPanel(normalizedData);
-          setNoPanelsMessage('');
-          
-          const responseEquiv = await fetch(`${apiBaseUrl}/api/equivalence`);
-          const equivalences = await responseEquiv.json();
-          const match = equivalences.find((e: any) => e.codigoPanel.toUpperCase().trim() === normalizedData.referencia.toUpperCase().trim() && e.activo);
-          
-          if (!match) {
-            setFooterState('error');
-            setFooterText('PANEL SIN EQUIVALENCIA CONFIGURADA');
-          } else if (!match.requiereOrnamento) {
-            setFooterState('waiting');
-            setFooterText('ESTE PANEL NO LLEVA ORNAMENTO');
+          const isNewPanel = !currentPanel || currentPanel.iD_OrdenProduccion !== normalizedData.iD_OrdenProduccion;
+
+          if (isNewPanel) {
+            setCurrentPanel(normalizedData);
+            setNoPanelsMessage('');
+            setValidationResult(null);
+            setDuplicateUseDetails(null);
+            setLabelPreview(null);
+            setRemainingMinText('');
+            setLastScannedQr('');
+            setShowQrForSeconds(false);
+
+            if (normalizedData.requiereOrnamento === false) {
+              setFooterState('waiting');
+              setFooterText('ESTE PANEL NO LLEVA ORNAMENTO');
+            } else {
+              setFooterState('waiting');
+              setFooterText('ESPERANDO LECTURA DE QR');
+            }
           } else {
-            setFooterState('waiting');
-            setFooterText('ESPERANDO LECTURA DE QR');
+            // Same panel: only set waiting if we were in idle state
+            if (footerState === 'idle') {
+              if (normalizedData.requiereOrnamento === false) {
+                setFooterState('waiting');
+                setFooterText('ESTE PANEL NO LLEVA ORNAMENTO');
+              } else {
+                setFooterState('waiting');
+                setFooterText('ESPERANDO LECTURA DE QR');
+              }
+            }
           }
         } else if (response.status === 404) {
           setCurrentPanel(null);
-          const errData = await response.json();
+          const errData = await response.json().catch(() => ({}));
           setNoPanelsMessage(errData.message || `SIN PANELES PENDIENTES PARA EL PUESTO ${puesto.toUpperCase()}`);
           setFooterState('idle');
           setFooterText(`SIN PANELES PENDIENTES PARA EL PUESTO ${puesto.toUpperCase()}`);
         } else {
           setDbConnected(false);
-          setFooterState('error');
-          setFooterText('SIN CONEXIÓN CON SQL SERVER');
+          if (!currentPanel) {
+            setFooterState('error');
+            setFooterText('SIN CONEXIÓN CON SQL SERVER');
+          }
         }
       } catch (err) {
         console.error("DB Fetch Error", err);
         setDbConnected(false);
-        if (active) {
-          setCurrentPanel(null);
+        if (active && !currentPanel) {
           setFooterState('error');
           setFooterText('SIN CONEXIÓN CON SQL SERVER');
         }
@@ -311,7 +326,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       active = false;
       clearInterval(polling);
     };
-  }, [puesto, refreshIntervalSec, isProcessing, validationResult, footerState]);
+  }, [puesto, refreshIntervalSec, isProcessing, autoAdvanceSeconds, currentPanel?.iD_OrdenProduccion, footerState]);
 
   // Fetch installed printer status
   useEffect(() => {

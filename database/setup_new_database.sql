@@ -179,6 +179,61 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    -- Si el puesto consultado es DL01, sincronizar y avanzar puntero si DL02 ya procesó el panel
+    IF UPPER(LTRIM(RTRIM(@Puesto))) = 'DL01' OR UPPER(@Puesto) LIKE '%DL01%'
+    BEGIN
+        DECLARE @MaxDL01 INT = 0;
+
+        SELECT @MaxDL01 = ISNULL(MAX(OP1.ID_OrdenProduccion), 0)
+        FROM dbo.Orden_Produccion OP1
+        WHERE UPPER(LTRIM(RTRIM(OP1.Puesto))) = 'DL01'
+          AND (
+              EXISTS (
+                  SELECT 1 
+                  FROM dbo.Produccion_Secuencia PS
+                  WHERE UPPER(LTRIM(RTRIM(PS.Puesto))) = 'DL02'
+                    AND PS.ID_OrdenProduccion = OP1.ID_OrdenProduccion
+              )
+              OR EXISTS (
+                  SELECT 1 
+                  FROM dbo.Produccion_Secuencia PS
+                  INNER JOIN dbo.Orden_Produccion OP2 
+                      ON PS.ID_OrdenProduccion = OP2.ID_OrdenProduccion
+                  WHERE UPPER(LTRIM(RTRIM(PS.Puesto))) = 'DL02'
+                    AND UPPER(LTRIM(RTRIM(OP2.Puesto))) = 'DL02'
+                    AND OP2.ID_OrdenCliente = OP1.ID_OrdenCliente
+                    AND OP2.Orden = OP1.Orden
+              )
+              OR EXISTS (
+                  SELECT 1 
+                  FROM dbo.Produccion_Secuencia PS
+                  WHERE UPPER(LTRIM(RTRIM(PS.Puesto))) = 'DL02'
+                    AND PS.ID_OrdenCliente = OP1.ID_OrdenCliente
+                    AND PS.Orden = OP1.Orden
+              )
+          );
+
+        IF @MaxDL01 > 0
+        BEGIN
+            UPDATE dbo.Puesto
+            SET Puntero_ID_OrdenProduccion = @MaxDL01,
+                Fecha_Puntero = GETDATE()
+            WHERE UPPER(LTRIM(RTRIM(Puesto))) = 'DL01'
+              AND Puntero_ID_OrdenProduccion < @MaxDL01;
+
+            INSERT INTO dbo.Produccion_Secuencia (ID_OrdenProduccion, ID_OrdenCliente, Puesto, Fecha, Orden, Resultado)
+            SELECT OP1.ID_OrdenProduccion, OP1.ID_OrdenCliente, 'DL01', GETDATE(), OP1.Orden, 'AUTO_DL02'
+            FROM dbo.Orden_Produccion OP1
+            WHERE UPPER(LTRIM(RTRIM(OP1.Puesto))) = 'DL01'
+              AND OP1.ID_OrdenProduccion <= @MaxDL01
+              AND NOT EXISTS (
+                  SELECT 1 FROM dbo.Produccion_Secuencia PS1
+                  WHERE PS1.ID_OrdenProduccion = OP1.ID_OrdenProduccion
+                    AND UPPER(LTRIM(RTRIM(PS1.Puesto))) = 'DL01'
+              );
+        END;
+    END;
+
     WITH Consulta_Principal AS
     (
         SELECT TOP (1)
@@ -195,7 +250,7 @@ BEGIN
             OP.Puesto,
             OP.Orden,
             OP.Estado,
-            OP.Posicion + OP.Mano AS Expr1,
+            ISNULL(OP.Posicion, '') + ISNULL(OP.Mano, '') AS Expr1,
             OP.Mano,
             OP.Posicion
         FROM dbo.Orden_Produccion AS OP
@@ -204,6 +259,29 @@ BEGIN
             AND OP.Puesto = P.Puesto
             AND OP.ID_OrdenProduccion > P.Puntero_ID_OrdenProduccion
         WHERE OP.Puesto LIKE '%' + @Puesto + '%'
+          AND NOT EXISTS (
+              SELECT 1 FROM dbo.Produccion_Secuencia PS 
+              WHERE PS.ID_OrdenProduccion = OP.ID_OrdenProduccion 
+                AND PS.Puesto = P.Puesto
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM dbo.Produccion_Secuencia PS_DL02
+              WHERE UPPER(LTRIM(RTRIM(PS_DL02.Puesto))) = 'DL02'
+                AND (
+                    PS_DL02.ID_OrdenProduccion = OP.ID_OrdenProduccion
+                    OR EXISTS (
+                        SELECT 1 FROM dbo.Orden_Produccion OP2
+                        WHERE OP2.ID_OrdenProduccion = PS_DL02.ID_OrdenProduccion
+                          AND UPPER(LTRIM(RTRIM(OP2.Puesto))) = 'DL02'
+                          AND OP2.ID_OrdenCliente = OP.ID_OrdenCliente
+                          AND OP2.Orden = OP.Orden
+                    )
+                    OR (
+                        PS_DL02.ID_OrdenCliente = OP.ID_OrdenCliente
+                        AND PS_DL02.Orden = OP.Orden
+                    )
+                )
+          )
         ORDER BY
             OP.ID_OrdenProduccion,
             OP.Orden
