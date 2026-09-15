@@ -764,5 +764,55 @@ WHERE UPPER(LTRIM(RTRIM(P.Puesto))) = 'DL01'
             string sql = "SELECT Referencia, ID_OrdenProduccion, ID_OrdenCliente, Orden, Secuencia, SD, (Posicion + Mano) AS Expr1, Puesto, Fecha_Secuencia AS FechaSecuencia, Mano, Posicion FROM dbo.Orden_Produccion WHERE ID_OrdenProduccion = @Id;";
             return await conn.QueryFirstOrDefaultAsync<PanelSequence>(sql, new { Id = idOrdenProduccion });
         }
+
+        public async Task<List<int>> GetPickPositionsForReferenceAsync(string referencia)
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT Señal FROM dbo.Link_Socket_TCP WHERE LTRIM(RTRIM(Referencia)) = @Referencia;";
+            var signals = await conn.QueryAsync<string>(sql, new { Referencia = referencia.Trim() });
+            
+            var result = new List<int>();
+            foreach (var sig in signals)
+            {
+                if (string.IsNullOrWhiteSpace(sig)) continue;
+                // Handle multiple positions comma-separated if present, e.g. "1,4" or just "14"
+                var parts = sig.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var part in parts)
+                {
+                    if (int.TryParse(part.Trim(), out int pos) && !result.Contains(pos))
+                    {
+                        result.Add(pos);
+                    }
+                }
+            }
+            return result;
+        }
+
+        public async Task<IEnumerable<LinkSocketTcp>> GetLinkSocketsAsync()
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT LTRIM(RTRIM(Referencia)) AS Referencia, LTRIM(RTRIM(Señal)) AS Señal FROM dbo.Link_Socket_TCP ORDER BY Referencia;";
+            return await conn.QueryAsync<LinkSocketTcp>(sql);
+        }
+
+        public async Task<bool> UpsertLinkSocketAsync(string referencia, string señal)
+        {
+            using var conn = GetConnection();
+            string sql = @"
+                IF EXISTS (SELECT 1 FROM dbo.Link_Socket_TCP WHERE LTRIM(RTRIM(Referencia)) = @Referencia)
+                    UPDATE dbo.Link_Socket_TCP SET Señal = @Señal WHERE LTRIM(RTRIM(Referencia)) = @Referencia;
+                ELSE
+                    INSERT INTO dbo.Link_Socket_TCP (Referencia, Señal) VALUES (@Referencia, @Señal);";
+            var rows = await conn.ExecuteAsync(sql, new { Referencia = referencia.Trim(), Señal = señal.Trim() });
+            return rows > 0;
+        }
+
+        public async Task<bool> DeleteLinkSocketAsync(string referencia)
+        {
+            using var conn = GetConnection();
+            string sql = "DELETE FROM dbo.Link_Socket_TCP WHERE LTRIM(RTRIM(Referencia)) = @Referencia;";
+            var rows = await conn.ExecuteAsync(sql, new { Referencia = referencia.Trim() });
+            return rows > 0;
+        }
     }
 }

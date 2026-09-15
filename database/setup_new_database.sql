@@ -52,6 +52,16 @@ BEGIN
 END;
 GO
 
+-- Tabla de Mapeo Pick-to-Light (Link_Socket_TCP) para Arduino ESP32
+IF OBJECT_ID('dbo.Link_Socket_TCP', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Link_Socket_TCP (
+        Referencia NCHAR(14) NOT NULL PRIMARY KEY,
+        Señal NCHAR(10) NOT NULL
+    );
+END;
+GO
+
 -- Tabla de Auditoría de Configuración
 IF OBJECT_ID('dbo.Auditoria_Configuracion', 'U') IS NULL
 BEGIN
@@ -443,6 +453,21 @@ IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Printer_IP
 IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Printer_Port')
     INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion) VALUES ('Printer_Port', '9100', 'Puerto TCP impresora Zebra');
 
+IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Arduino_Enabled')
+    INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion) VALUES ('Arduino_Enabled', 'true', 'Habilitar comunicacion TCP con Arduino ESP32');
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Arduino_IP')
+    INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion) VALUES ('Arduino_IP', '192.168.3.200', 'Direccion IP del Arduino ESP32');
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Arduino_Port')
+    INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion) VALUES ('Arduino_Port', '8080', 'Puerto TCP del Arduino ESP32');
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Arduino_Heartbeat_Timeout_Sec')
+    INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion) VALUES ('Arduino_Heartbeat_Timeout_Sec', '15', 'Tiempo maximo sin heartbeat antes de reconectar');
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Arduino_Reconnect_Interval_Sec')
+    INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion) VALUES ('Arduino_Reconnect_Interval_Sec', '5', 'Intervalo de reintento de conexion en segundos');
+
 IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Printer_Zpl_Template')
     INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion) VALUES ('Printer_Zpl_Template', '^XA
 ^LH30,20
@@ -494,6 +519,21 @@ IF NOT EXISTS (SELECT 1 FROM dbo.Equivalencia_Panel_Ornamento WHERE CodigoPanel 
 
 IF NOT EXISTS (SELECT 1 FROM dbo.Equivalencia_Panel_Ornamento WHERE CodigoPanel = '67630-0KF30-C0')
     INSERT INTO dbo.Equivalencia_Panel_Ornamento (CodigoPanel, CodigoOrnamento, RequiereOrnamento) VALUES ('67630-0KF30-C0', NULL, 0);
+GO
+
+-- Inserción de Mapeos Pick-to-Light (Link_Socket_TCP) si la tabla está vacía
+IF NOT EXISTS (SELECT 1 FROM dbo.Link_Socket_TCP)
+BEGIN
+    INSERT INTO dbo.Link_Socket_TCP (Referencia, Señal) VALUES
+    ('67610-0KM60-C0', '1'),
+    ('67620-0KM60-C0', '2'),
+    ('67610-0KM70-C0', '3'),
+    ('67620-0KM70-C0', '4'),
+    ('67610-0KM80-C4', '5'),
+    ('67620-0KM80-C4', '14'),
+    ('67640-0KF40-C0', '15'),
+    ('67630-0KF30-C0', '16');
+END;
 GO
 
 -- Inserción de Puesto DL01 por defecto si no existe

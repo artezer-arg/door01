@@ -18,15 +18,18 @@ namespace Backend.Controllers
         private readonly IDatabaseService _dbService;
         private readonly IQrParsingService _qrParser;
         private readonly IPrintingService _printer;
+        private readonly IArduinoService _arduinoService;
 
         public ValidationController(
             IDatabaseService dbService, 
             IQrParsingService qrParser, 
-            IPrintingService printer)
+            IPrintingService printer,
+            IArduinoService arduinoService)
         {
             _dbService = dbService;
             _qrParser = qrParser;
             _printer = printer;
+            _arduinoService = arduinoService;
         }
 
         [HttpGet("history")]
@@ -248,6 +251,8 @@ namespace Backend.Controllers
                     await _dbService.UpdateValidationPointerAdvancedAsync(validation.ID_Validacion);
                     validation.FechaAvancePuntero = DateTime.Now;
 
+                    _ = _arduinoService.SendClearAsync();
+
                     return Ok(new { 
                         success = true, 
                         message = "PROCESO COMPLETADO", 
@@ -360,6 +365,8 @@ namespace Backend.Controllers
 
                     await _dbService.UpdateValidationPointerAdvancedAsync(validation.ID_Validacion);
                     validation.FechaAvancePuntero = DateTime.Now;
+
+                    _ = _arduinoService.SendClearAsync();
 
                     return Ok(new { 
                         success = true, 

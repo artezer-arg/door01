@@ -189,6 +189,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
   // Hardware Status Indicators
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const [printerOnline, setPrinterOnline] = useState<boolean | null>(null);
+  const [arduinoOnline, setArduinoOnline] = useState<boolean | null>(null);
 
   // Footer & Process State
   const [footerState, setFooterState] = useState<'waiting' | 'processing' | 'approved' | 'rejected' | 'error' | 'idle'>('idle');
@@ -344,6 +345,32 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       }
     };
     checkPrinter();
+  }, [apiBaseUrl]);
+
+  // Fetch Arduino ESP32 status periodically
+  useEffect(() => {
+    let active = true;
+    const checkArduino = async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/arduino/status`);
+        if (!active) return;
+        if (res.ok) {
+          const data = await res.json();
+          setArduinoOnline(!!data.isConnected);
+        } else {
+          setArduinoOnline(false);
+        }
+      } catch {
+        if (active) setArduinoOnline(false);
+      }
+    };
+
+    checkArduino();
+    const interval = setInterval(checkArduino, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [apiBaseUrl]);
 
   // Capture barcode wedge (globally)
@@ -784,6 +811,24 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
               <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>ZEBRA</span>
               <span style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
                 {printerOnline ? 'ONLINE' : 'FALLA/PREVIEW'}
+              </span>
+            </div>
+          </div>
+
+          {/* Arduino ESP32 Pick-to-Light Status */}
+          <div className="tb-telemetry-badge">
+            <span style={{ 
+              width: '11px', 
+              height: '11px', 
+              borderRadius: '50%', 
+              background: arduinoOnline ? '#22c55e' : '#ef4444',
+              boxShadow: arduinoOnline ? '0 0 10px #22c55e' : '0 0 10px #ef4444',
+              display: 'inline-block' 
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>ARDUINO</span>
+              <span style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                {arduinoOnline ? 'ONLINE' : 'OFFLINE'}
               </span>
             </div>
           </div>

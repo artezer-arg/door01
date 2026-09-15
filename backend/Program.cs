@@ -25,6 +25,9 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<IDatabaseService, DatabaseService>();
 builder.Services.AddSingleton<IQrParsingService, QrParsingService>();
 builder.Services.AddSingleton<IPrintingService, PrintingService>();
+builder.Services.AddSingleton<ArduinoService>();
+builder.Services.AddSingleton<IArduinoService>(sp => sp.GetRequiredService<ArduinoService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ArduinoService>());
 
 var app = builder.Build();
 

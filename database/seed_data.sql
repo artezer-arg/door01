@@ -52,6 +52,11 @@ VALUES
 ('Printer_Mode', 'Spooler', 'Modo de conexion de la impresora: Spooler, NetworkRaw', 'SEED'),
 ('Printer_IP', '192.168.1.100', 'Direccion IP de la impresora Zebra en red', 'SEED'),
 ('Printer_Port', '9100', 'Puerto TCP de la impresora Zebra en red', 'SEED'),
+('Arduino_Enabled', 'true', 'Habilitar comunicacion TCP con Arduino ESP32', 'SEED'),
+('Arduino_IP', '192.168.3.200', 'Direccion IP del Arduino ESP32', 'SEED'),
+('Arduino_Port', '8080', 'Puerto TCP del Arduino ESP32', 'SEED'),
+('Arduino_Heartbeat_Timeout_Sec', '15', 'Tiempo maximo sin heartbeat antes de reconectar', 'SEED'),
+('Arduino_Reconnect_Interval_Sec', '5', 'Intervalo de reintento de conexion en segundos', 'SEED'),
 ('Printer_Zpl_Template', '^XA
 ^LH30,20
 ^FO10,10^GB560,410,4^FS
@@ -72,6 +77,21 @@ VALUES
 ^FO35,365^FDCurado: {MinutosCurado} min^FS
 ^FO420,230^BQN,2,6^FDQA,{QrCompleto}^FS
 ^XZ', 'Plantilla ZPL de diseño del Kanban', 'SEED');
+GO
+
+-- 2b. Seed Link_Socket_TCP if empty
+IF NOT EXISTS (SELECT 1 FROM dbo.Link_Socket_TCP)
+BEGIN
+    INSERT INTO dbo.Link_Socket_TCP (Referencia, Señal) VALUES
+    ('67610-0KM60-C0', '1'),
+    ('67620-0KM60-C0', '2'),
+    ('67610-0KM70-C0', '3'),
+    ('67620-0KM70-C0', '4'),
+    ('67610-0KM80-C4', '5'),
+    ('67620-0KM80-C4', '14'),
+    ('67640-0KF40-C0', '15'),
+    ('67630-0KF30-C0', '16');
+END;
 GO
 
 -- 3. Reset Workstation Pointer for DL01 to 952 to ensure it picks up 953

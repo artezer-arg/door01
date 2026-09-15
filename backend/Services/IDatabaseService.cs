@@ -29,5 +29,9 @@ namespace Backend.Services
             DateTime? desde, DateTime? hasta, string? panel, string? ornament, 
             int? ordenId, int? secuencia, string? puesto, string? result, string? motivo);
         Task<PanelSequence?> GetOrderProductionByIdAsync(int idOrdenProduccion);
+        Task<List<int>> GetPickPositionsForReferenceAsync(string referencia);
+        Task<IEnumerable<LinkSocketTcp>> GetLinkSocketsAsync();
+        Task<bool> UpsertLinkSocketAsync(string referencia, string señal);
+        Task<bool> DeleteLinkSocketAsync(string referencia);
     }
 }

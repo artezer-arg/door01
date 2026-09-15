@@ -75,6 +75,19 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
   const [testConnSuccess, setTestConnSuccess] = useState<boolean | null>(null);
   const [isTestingConn, setIsTestingConn] = useState(false);
 
+  // Arduino ESP32 State
+  const [arduinoEnabled, setArduinoEnabled] = useState(true);
+  const [arduinoIp, setArduinoIp] = useState('192.168.3.200');
+  const [arduinoPort, setArduinoPort] = useState('8080');
+  const [arduinoStatus, setArduinoStatus] = useState<any>(null);
+  const [arduinoMappings, setArduinoMappings] = useState<{ referencia: string; señal: string }[]>([]);
+  const [newMappingRef, setNewMappingRef] = useState('');
+  const [newMappingSignal, setNewMappingSignal] = useState('');
+  const [testPosition, setTestPosition] = useState<number>(14);
+  const [testPickOrden, setTestPickOrden] = useState('OP-1001');
+  const [testPickPositions, setTestPickPositions] = useState('14');
+  const [arduinoMsg, setArduinoMsg] = useState('');
+
   useEffect(() => {
     if (isAuthenticated) {
       loadConfigurations();
@@ -82,6 +95,13 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
       loadAuditLogs();
       loadInstalledPrinters();
       loadConnectionString();
+      loadArduinoStatus();
+      loadArduinoMappings();
+
+      const timer = setInterval(() => {
+        loadArduinoStatus();
+      }, 3000);
+      return () => clearInterval(timer);
     }
   }, [isAuthenticated]);
 
@@ -202,6 +222,141 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
       if (res.ok) {
         const data = await res.json();
         setAuditLogs(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const loadArduinoStatus = async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/arduino/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setArduinoStatus(data);
+        if (data.ip) setArduinoIp(data.ip);
+        if (data.port) setArduinoPort(data.port.toString());
+        setArduinoEnabled(data.enabled !== false);
+      }
+    } catch (e) {
+      console.error("Error loading Arduino status:", e);
+    }
+  };
+
+  const loadArduinoMappings = async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/arduino/mapping`);
+      if (res.ok) {
+        const data = await res.json();
+        setArduinoMappings(data);
+      }
+    } catch (e) {
+      console.error("Error loading Arduino mappings:", e);
+    }
+  };
+
+  const handleSaveArduinoConfig = async () => {
+    setArduinoMsg('Guardando configuración de Arduino...');
+    const ok1 = await handleSaveConfig('Arduino_Enabled', arduinoEnabled ? 'true' : 'false', 'Configuración Arduino');
+    const ok2 = await handleSaveConfig('Arduino_IP', arduinoIp.trim(), 'Configuración Arduino');
+    const ok3 = await handleSaveConfig('Arduino_Port', arduinoPort.trim(), 'Configuración Arduino');
+    if (ok1 && ok2 && ok3) {
+      setArduinoMsg('Configuración guardada exitosamente. Reconectando...');
+      await fetch(`${apiBaseUrl}/api/arduino/reconnect`, { method: 'POST' });
+      setTimeout(loadArduinoStatus, 1500);
+    } else {
+      setArduinoMsg('Error al guardar la configuración.');
+    }
+  };
+
+  const handleReconnectArduino = async () => {
+    setArduinoMsg('Iniciando reconexión TCP con ESP32...');
+    try {
+      await fetch(`${apiBaseUrl}/api/arduino/reconnect`, { method: 'POST' });
+      setArduinoMsg('Reconexión solicitada.');
+      setTimeout(loadArduinoStatus, 1000);
+    } catch (e: any) {
+      setArduinoMsg(`Error al reconectar: ${e.message}`);
+    }
+  };
+
+  const handleSendClear = async () => {
+    setArduinoMsg('Enviando comando CLEAR...');
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/arduino/clear`, { method: 'POST' });
+      const data = await res.json();
+      setArduinoMsg(data.message || 'Comando CLEAR enviado.');
+      loadArduinoStatus();
+    } catch (e: any) {
+      setArduinoMsg(`Error: ${e.message}`);
+    }
+  };
+
+  const handleTestSingleLight = async (state: boolean) => {
+    setArduinoMsg(`Enviando LIGHT_TEST posición ${testPosition} (${state ? 'ON' : 'OFF'})...`);
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/arduino/test-light`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ position: testPosition, state })
+      });
+      const data = await res.json();
+      setArduinoMsg(data.message || 'Comando de prueba enviado.');
+      loadArduinoStatus();
+    } catch (e: any) {
+      setArduinoMsg(`Error: ${e.message}`);
+    }
+  };
+
+  const handleSendTestPick = async () => {
+    const posList = testPickPositions.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    if (posList.length === 0) {
+      setArduinoMsg('Debe especificar al menos una posición numérica válida.');
+      return;
+    }
+
+    setArduinoMsg(`Enviando orden pick [${posList.join(',')}]...`);
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/arduino/pick`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orden: testPickOrden.trim(), pick: posList })
+      });
+      const data = await res.json();
+      setArduinoMsg(data.message || 'Orden pick enviada.');
+      loadArduinoStatus();
+    } catch (e: any) {
+      setArduinoMsg(`Error: ${e.message}`);
+    }
+  };
+
+  const handleSaveMapping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMappingRef.trim() || !newMappingSignal.trim()) return;
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/arduino/mapping`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referencia: newMappingRef.trim(), señal: newMappingSignal.trim() })
+      });
+      if (res.ok) {
+        setNewMappingRef('');
+        setNewMappingSignal('');
+        loadArduinoMappings();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteMapping = async (ref: string) => {
+    if (!window.confirm(`¿Eliminar mapeo para ${ref}?`)) return;
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/arduino/mapping/${encodeURIComponent(ref)}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        loadArduinoMappings();
       }
     } catch (e) {
       console.error(e);
@@ -715,6 +870,278 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
                 <Save size={16} />
                 Guardar Configuración
               </button>
+            </div>
+          </section>
+
+          {/* ARDUINO ESP32 PICK-TO-LIGHT SECTION */}
+          <section className="card-panel" style={{ borderLeft: '4px solid #10b981' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0, fontSize: '15px', color: '#059669', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800 }}>
+                💡 Arduino ESP32 (Pick-to-Light TCP)
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ 
+                  width: '10px', 
+                  height: '10px', 
+                  borderRadius: '50%', 
+                  background: arduinoStatus?.isConnected ? '#22c55e' : '#ef4444',
+                  boxShadow: arduinoStatus?.isConnected ? '0 0 8px #22c55e' : '0 0 8px #ef4444',
+                  display: 'inline-block' 
+                }} />
+                <span style={{ 
+                  fontSize: '11px', 
+                  fontWeight: 800, 
+                  color: arduinoStatus?.isConnected ? '#15803d' : '#b91c1c',
+                  background: arduinoStatus?.isConnected ? '#dcfce7' : '#fee2e2',
+                  padding: '3px 8px',
+                  borderRadius: '6px'
+                }}>
+                  {arduinoStatus?.isConnected ? `CONECTADO (${arduinoIp}:${arduinoPort})` : `DESCONECTADO (${arduinoIp}:${arduinoPort})`}
+                </span>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ padding: '4px 10px', fontSize: '11px' }}
+                  onClick={handleReconnectArduino}
+                  title="Forzar reconexión con ESP32"
+                >
+                  🔄 Reconectar
+                </button>
+              </div>
+            </div>
+
+            {/* Live Telemetry Info Row */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr 1fr', 
+              gap: '10px', 
+              background: 'rgba(0,0,0,0.02)', 
+              padding: '10px 14px', 
+              borderRadius: '8px', 
+              fontSize: '11px', 
+              marginBottom: '16px' 
+            }}>
+              <div>
+                <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Último Heartbeat:</span>
+                <strong style={{ color: 'var(--text-primary)' }}>
+                  {arduinoStatus?.lastHeartbeat ? new Date(arduinoStatus.lastHeartbeat).toLocaleTimeString() : 'Sin señal'}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Último ACK Recibido:</span>
+                <strong style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>
+                  {arduinoStatus?.lastAck ? 'ORDER_RECEIVED' : 'Ninguno'}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Último Comando Enviado:</span>
+                <strong style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>
+                  {arduinoStatus?.lastCommandSent || 'Ninguno'}
+                </strong>
+              </div>
+              {arduinoStatus?.lastErrorMessage && (
+                <div style={{ gridColumn: 'span 3', color: '#dc2626', fontWeight: 600 }}>
+                  ⚠️ Estado / Error: {arduinoStatus.lastErrorMessage}
+                </div>
+              )}
+            </div>
+
+            {/* Network Settings */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+              <div className="form-group">
+                <label>Dirección IP del Arduino (ESP32):</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={arduinoIp} 
+                  onChange={(e) => setArduinoIp(e.target.value)} 
+                  placeholder="192.168.3.200"
+                />
+              </div>
+              <div className="form-group">
+                <label>Puerto TCP:</label>
+                <input 
+                  type="number" 
+                  className="form-input" 
+                  value={arduinoPort} 
+                  onChange={(e) => setArduinoPort(e.target.value)} 
+                  placeholder="8080"
+                />
+              </div>
+              <div className="form-group" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="arduinoEnabledCheck" 
+                    checked={arduinoEnabled} 
+                    onChange={(e) => setArduinoEnabled(e.target.checked)} 
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="arduinoEnabledCheck" style={{ margin: 0, fontWeight: 600, cursor: 'pointer' }}>
+                    Habilitar comunicación TCP con Arduino ESP32
+                  </label>
+                </div>
+                <button type="button" className="btn btn-secondary" onClick={handleSaveArduinoConfig} style={{ padding: '6px 14px', fontSize: '12px' }}>
+                  Guardar Parámetros de Red
+                </button>
+              </div>
+            </div>
+
+            {/* Live Testing Controls */}
+            <div style={{ 
+              border: '1px solid rgba(0,0,0,0.08)', 
+              borderRadius: '10px', 
+              padding: '14px', 
+              background: '#f8fafc', 
+              marginBottom: '16px' 
+            }}>
+              <strong style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#475569', display: 'block', marginBottom: '10px' }}>
+                🛠️ Pruebas Manuales de Luces (Diagnóstico)
+              </strong>
+              
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end', marginBottom: '12px' }}>
+                {/* Single Light Test */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, margin: 0 }}>Posición (1..32):</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    style={{ width: '70px', padding: '6px' }} 
+                    value={testPosition} 
+                    onChange={(e) => setTestPosition(parseInt(e.target.value) || 1)} 
+                    min={1} 
+                    max={64}
+                  />
+                  <button type="button" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleTestSingleLight(true)}>
+                    💡 Encender
+                  </button>
+                  <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleTestSingleLight(false)}>
+                    ⚫ Apagar
+                  </button>
+                </div>
+
+                {/* Emergency Clear Button */}
+                <button 
+                  type="button" 
+                  onClick={handleSendClear}
+                  style={{ 
+                    background: '#dc2626', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    padding: '8px 16px', 
+                    fontWeight: 700, 
+                    fontSize: '12px', 
+                    cursor: 'pointer',
+                    marginLeft: 'auto'
+                  }}
+                >
+                  🛑 APAGAR TODO (CLEAR)
+                </button>
+              </div>
+
+              {/* Order Pick Test */}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, margin: 0 }}>Orden:</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  style={{ width: '110px', padding: '6px' }} 
+                  value={testPickOrden} 
+                  onChange={(e) => setTestPickOrden(e.target.value)} 
+                />
+                <label style={{ fontSize: '12px', fontWeight: 600, margin: 0 }}>Posiciones (ej. 1,4,7):</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  style={{ width: '130px', padding: '6px' }} 
+                  value={testPickPositions} 
+                  onChange={(e) => setTestPickPositions(e.target.value)} 
+                />
+                <button type="button" className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }} onClick={handleSendTestPick}>
+                  🚀 Enviar Pick
+                </button>
+              </div>
+
+              {arduinoMsg && (
+                <div style={{ marginTop: '10px', fontSize: '12px', color: '#0284c7', fontWeight: 600 }}>
+                  {arduinoMsg}
+                </div>
+              )}
+            </div>
+
+            {/* Mapeo Link_Socket_TCP Table */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <strong style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#334155' }}>
+                  📋 Mapeo de Posiciones Pick-to-Light (dbo.Link_Socket_TCP)
+                </strong>
+              </div>
+
+              <form onSubmit={handleSaveMapping} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  style={{ flex: 2, padding: '6px 10px', fontSize: '12px' }} 
+                  placeholder="Referencia Panel (ej. 67620-0KM80-C4)" 
+                  value={newMappingRef} 
+                  onChange={(e) => setNewMappingRef(e.target.value)} 
+                  required
+                />
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  style={{ flex: 1, padding: '6px 10px', fontSize: '12px' }} 
+                  placeholder="Señal / Posición (ej. 14)" 
+                  value={newMappingSignal} 
+                  onChange={(e) => setNewMappingSignal(e.target.value)} 
+                  required
+                />
+                <button type="submit" className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '12px' }}>
+                  Guardar Mapeo
+                </button>
+              </form>
+
+              <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                      <th style={{ padding: '6px 12px' }}>Referencia de Panel</th>
+                      <th style={{ padding: '6px 12px' }}>Posición / Señal de Luz</th>
+                      <th style={{ padding: '6px 12px', width: '50px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {arduinoMappings.map((m, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontWeight: 700 }}>{m.referencia}</td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <span style={{ background: '#e0f2fe', color: '#0369a1', fontWeight: 800, padding: '2px 8px', borderRadius: '4px' }}>
+                            Posición {m.señal}
+                          </span>
+                        </td>
+                        <td style={{ padding: '6px 12px', textAlign: 'right' }}>
+                          <button 
+                            type="button" 
+                            onClick={() => handleDeleteMapping(m.referencia)} 
+                            style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}
+                            title="Eliminar mapeo"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {arduinoMappings.length === 0 && (
+                      <tr>
+                        <td colSpan={3} style={{ padding: '12px', textAlign: 'center', color: '#94a3b8' }}>
+                          No hay mapeos configurados en Link_Socket_TCP.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
 

@@ -11,10 +11,12 @@ namespace Backend.Controllers
     public class SequenceController : ControllerBase
     {
         private readonly IDatabaseService _dbService;
+        private readonly IArduinoService _arduinoService;
 
-        public SequenceController(IDatabaseService dbService)
+        public SequenceController(IDatabaseService dbService, IArduinoService arduinoService)
         {
             _dbService = dbService;
+            _arduinoService = arduinoService;
         }
 
         [HttpGet("next")]
@@ -30,8 +32,12 @@ namespace Backend.Controllers
                 var nextPanel = await _dbService.GetNextPanelAsync(puesto);
                 if (nextPanel == null)
                 {
+                    _ = _arduinoService.SendClearAsync();
                     return NotFound(new { message = $"SIN PANELES PENDIENTES PARA EL PUESTO {puesto.ToUpper()}" });
                 }
+
+                // Disparar las luces Pick-to-Light para este panel de forma no bloqueante
+                _ = _arduinoService.TriggerPanelLightsAsync(nextPanel.Referencia, nextPanel.ID_OrdenProduccion);
 
                 // Check equivalence mapping dynamically to see if ornament is required
                 var equiv = await _dbService.GetEquivalenceAsync(nextPanel.Referencia);

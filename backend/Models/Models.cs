@@ -84,4 +84,41 @@ namespace Backend.Models
         public string UsuarioModificacion { get; set; } = string.Empty;
         public string? Motivo { get; set; }
     }
+
+    public class LinkSocketTcp
+    {
+        public string Referencia { get; set; } = string.Empty;
+        public string Señal { get; set; } = string.Empty;
+    }
+
+    public class LinkSocketUpsertRequest
+    {
+        public string Referencia { get; set; } = string.Empty;
+        public string Señal { get; set; } = string.Empty;
+    }
+
+    public class ArduinoStatus
+    {
+        public bool Enabled { get; set; }
+        public bool IsConnected { get; set; }
+        public string Ip { get; set; } = string.Empty;
+        public int Port { get; set; }
+        public DateTime? LastHeartbeat { get; set; }
+        public DateTime? LastConnected { get; set; }
+        public string? LastAck { get; set; }
+        public string? LastCommandSent { get; set; }
+        public string? LastErrorMessage { get; set; }
+    }
+
+    public class ArduinoLightTestRequest
+    {
+        public int Position { get; set; }
+        public bool State { get; set; }
+    }
+
+    public class ArduinoPickOrderRequest
+    {
+        public string Orden { get; set; } = string.Empty;
+        public System.Collections.Generic.List<int> Pick { get; set; } = new();
+    }
 }
