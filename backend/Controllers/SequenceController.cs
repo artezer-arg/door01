@@ -43,6 +43,8 @@ namespace Backend.Controllers
                 var equiv = await _dbService.GetEquivalenceAsync(nextPanel.Referencia);
                 bool requiereOrnamento = equiv?.RequiereOrnamento ?? true; // Default to true if not configured
 
+                var latestValidation = await _dbService.GetLatestApprovedValidationByOrderAsync(nextPanel.ID_OrdenProduccion);
+
                 return Ok(new {
                     nextPanel.Referencia,
                     nextPanel.ID_OrdenProduccion,
@@ -55,7 +57,9 @@ namespace Backend.Controllers
                     nextPanel.FechaSecuencia,
                     nextPanel.Mano,
                     nextPanel.Posicion,
-                    RequiereOrnamento = requiereOrnamento
+                    RequiereOrnamento = requiereOrnamento,
+                    YaValidado = latestValidation != null,
+                    UltimaValidacion = latestValidation
                 });
             }
             catch (Exception ex)

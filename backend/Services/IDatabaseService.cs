@@ -33,5 +33,6 @@ namespace Backend.Services
         Task<IEnumerable<LinkSocketTcp>> GetLinkSocketsAsync();
         Task<bool> UpsertLinkSocketAsync(string referencia, string señal);
         Task<bool> DeleteLinkSocketAsync(string referencia);
+        Task<Validacion?> GetLatestApprovedValidationByOrderAsync(int idOrdenProduccion);
     }
 }

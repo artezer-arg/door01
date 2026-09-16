@@ -814,5 +814,12 @@ WHERE UPPER(LTRIM(RTRIM(P.Puesto))) = 'DL01'
             var rows = await conn.ExecuteAsync(sql, new { Referencia = referencia.Trim() });
             return rows > 0;
         }
+
+        public async Task<Validacion?> GetLatestApprovedValidationByOrderAsync(int idOrdenProduccion)
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT TOP 1 * FROM dbo.Validacion_Ornamento WHERE ID_OrdenProduccion = @Id AND ResultadoGeneral = 'APROBADO' ORDER BY ID_Validacion DESC;";
+            return await conn.QueryFirstOrDefaultAsync<Validacion>(sql, new { Id = idOrdenProduccion });
+        }
     }
 }

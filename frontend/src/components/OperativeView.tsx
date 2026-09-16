@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   CheckCircle, XCircle, AlertTriangle, RefreshCw, 
@@ -106,6 +106,8 @@ interface Panel {
   mano?: string;
   posicion?: string;
   requiereOrnamento?: boolean;
+  yaValidado?: boolean;
+  ultimaValidacion?: ValidationResult | null;
 }
 
 interface ValidationResult {
@@ -208,6 +210,9 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
   // Auto-advance countdown timer
   const [autoAdvanceSeconds, setAutoAdvanceSeconds] = useState<number | null>(null);
 
+  // Track last automatically confirmed panel without ornament
+  const autoConfirmedOrderIdRef = useRef<number | null>(null);
+
   // Keep ticking clock
   useEffect(() => {
     const timer = setInterval(() => {
@@ -230,6 +235,89 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     if (!panel) return false;
     const mano = (panel.mano || '').toUpperCase();
     return mano.includes('IZQUIERDO') || mano.startsWith('I') || mano.includes('LH');
+  };
+
+  // Confirm Panel Without Ornament (Case B) & Auto-print
+  const handleConfirmNoOrnament = async (targetPanel?: Panel) => {
+    const panel = targetPanel || currentPanel;
+    if (!panel || isProcessing) return;
+    if (autoConfirmedOrderIdRef.current === panel.iD_OrdenProduccion) return;
+    autoConfirmedOrderIdRef.current = panel.iD_OrdenProduccion;
+
+    setIsProcessing(true);
+    setFooterState('processing');
+    setFooterText('PANEL SIN ORNAMENTO: IMPRIMIENDO KANBAN AUTOMÁTICO...');
+    
+    setValidationResult(null);
+    setLabelPreview(null);
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/validation/confirm-no-ornament`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          panelReference: panel.referencia,
+          iD_OrdenProduccion: mockDbError ? 0 : panel.iD_OrdenProduccion,
+          iD_OrdenCliente: panel.iD_OrdenCliente,
+          orden: panel.orden,
+          secuencia: panel.secuencia,
+          sd: panel.sd,
+          expr1: panel.expr1,
+          puesto: puesto,
+          operador: operador,
+          mano: panel.mano,
+          posicion: panel.posicion
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        
+        if (mockPrintFolderError && result.success) {
+          setFooterState('error');
+          setFooterText('ERROR DE IMPRESIÓN');
+          playSound('error');
+          setIsProcessing(false);
+          return;
+        }
+
+        setValidationResult(result.validation);
+        if (result.preview) setLabelPreview(result.preview);
+
+        if (result.success) {
+          setFooterState('approved');
+          setFooterText('PROCESO COMPLETADO');
+          playSound('success');
+          setIsProcessing(false);
+          setAutoAdvanceSeconds(null);
+        } else {
+          playSound('error');
+          if (result.message === 'ERROR DE IMPRESIÓN') {
+            setFooterState('error');
+            setFooterText('ERROR DE IMPRESIÓN');
+          } else if (result.dbError) {
+            setFooterState('error');
+            setFooterText('ERROR AL ACTUALIZAR SECUENCIA EN BASE DE DATOS');
+          } else {
+            setFooterState('rejected');
+            setFooterText(result.validation?.motivoRechazo || 'CONFIRMACIÓN FALLIDA');
+          }
+          setIsProcessing(false);
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setFooterState('error');
+        setFooterText(err.detail || err.message || 'ERROR AL CONFIRMAR PANEL SIN ORNAMENTO');
+        playSound('error');
+        setIsProcessing(false);
+      }
+    } catch (e) {
+      console.error(e);
+      setFooterState('error');
+      setFooterText('FALLO AL PROCESAR SOLICITUD');
+      playSound('error');
+      setIsProcessing(false);
+    }
   };
 
   // Main Polling effect to fetch the next panel
@@ -259,7 +347,9 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
             fechaSecuencia: data.fechaSecuencia || data.FechaSecuencia,
             mano: data.mano || data.Mano || '',
             posicion: data.posicion || data.Posicion || '',
-            requiereOrnamento: data.requiereOrnamento !== undefined ? data.requiereOrnamento : (data.RequiereOrnamento !== undefined ? data.RequiereOrnamento : true)
+            requiereOrnamento: data.requiereOrnamento !== undefined ? data.requiereOrnamento : (data.RequiereOrnamento !== undefined ? data.RequiereOrnamento : true),
+            yaValidado: data.yaValidado !== undefined ? data.yaValidado : (data.YaValidado !== undefined ? data.YaValidado : false),
+            ultimaValidacion: data.ultimaValidacion || data.UltimaValidacion || null
           };
 
           const isNewPanel = !currentPanel || currentPanel.iD_OrdenProduccion !== normalizedData.iD_OrdenProduccion;
@@ -267,26 +357,40 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           if (isNewPanel) {
             setCurrentPanel(normalizedData);
             setNoPanelsMessage('');
-            setValidationResult(null);
             setDuplicateUseDetails(null);
-            setLabelPreview(null);
             setRemainingMinText('');
             setLastScannedQr('');
             setShowQrForSeconds(false);
 
-            if (normalizedData.requiereOrnamento === false) {
-              setFooterState('waiting');
-              setFooterText('ESTE PANEL NO LLEVA ORNAMENTO');
+            if (normalizedData.yaValidado && normalizedData.ultimaValidacion) {
+              // Ya validado en BD previamente (ej. tras refresh F5 esperando a DL02)
+              setValidationResult(normalizedData.ultimaValidacion);
+              setFooterState('approved');
+              setFooterText('PROCESO COMPLETADO');
+            } else if (normalizedData.requiereOrnamento === false) {
+              // NUEVA SECUENCIA SIN ORNAMENTO: Imprimir automáticamente sin escanear
+              setValidationResult(null);
+              setLabelPreview(null);
+              handleConfirmNoOrnament(normalizedData);
             } else {
+              // Requiere ornamento: esperar lectura del código QR
+              setValidationResult(null);
+              setLabelPreview(null);
               setFooterState('waiting');
               setFooterText('ESPERANDO LECTURA DE QR');
             }
           } else {
-            // Same panel: only set waiting if we were in idle state
-            if (footerState === 'idle') {
-              if (normalizedData.requiereOrnamento === false) {
-                setFooterState('waiting');
-                setFooterText('ESTE PANEL NO LLEVA ORNAMENTO');
+            // Mismo panel
+            if (normalizedData.yaValidado && footerState !== 'approved' && normalizedData.ultimaValidacion) {
+              setValidationResult(normalizedData.ultimaValidacion);
+              setFooterState('approved');
+              setFooterText('PROCESO COMPLETADO');
+            } else if (footerState === 'idle') {
+              if (normalizedData.requiereOrnamento === false && !normalizedData.yaValidado) {
+                handleConfirmNoOrnament(normalizedData);
+              } else if (normalizedData.requiereOrnamento === false) {
+                setFooterState('approved');
+                setFooterText('PROCESO COMPLETADO');
               } else {
                 setFooterState('waiting');
                 setFooterText('ESPERANDO LECTURA DE QR');
@@ -540,85 +644,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     }
   };
 
-  // Confirm Panel Without Ornament (Case B)
-  const handleConfirmNoOrnament = async () => {
-    if (!currentPanel || isProcessing) return;
 
-    setIsProcessing(true);
-    setFooterState('processing');
-    setFooterText('REGISTRANDO PANEL SIN ORNAMENTO...');
-    
-    setValidationResult(null);
-    setLabelPreview(null);
-
-    try {
-      const res = await fetch(`${apiBaseUrl}/api/validation/confirm-no-ornament`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          panelReference: currentPanel.referencia,
-          iD_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion,
-          iD_OrdenCliente: currentPanel.iD_OrdenCliente,
-          orden: currentPanel.orden,
-          secuencia: currentPanel.secuencia,
-          sd: currentPanel.sd,
-          expr1: currentPanel.expr1,
-          puesto: puesto,
-          operador: operador,
-          mano: currentPanel.mano,
-          posicion: currentPanel.posicion
-        })
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        
-        if (mockPrintFolderError && result.success) {
-          setFooterState('error');
-          setFooterText('ERROR DE IMPRESIÓN');
-          playSound('error');
-          setIsProcessing(false);
-          return;
-        }
-
-        setValidationResult(result.validation);
-        if (result.preview) setLabelPreview(result.preview);
-
-        if (result.success) {
-          setFooterState('approved');
-          setFooterText('PROCESO COMPLETADO');
-          playSound('success');
-          setIsProcessing(false);
-          setAutoAdvanceSeconds(null);
-        } else {
-          playSound('error');
-          if (result.message === 'ERROR DE IMPRESIÓN') {
-            setFooterState('error');
-            setFooterText('ERROR DE IMPRESIÓN');
-          } else if (result.dbError) {
-            setFooterState('error');
-            setFooterText('ERROR AL ACTUALIZAR SECUENCIA EN BASE DE DATOS');
-          } else {
-            setFooterState('rejected');
-            setFooterText(result.validation.motivoRechazo || 'CONFIRMACIÓN FALLIDA');
-          }
-          setIsProcessing(false);
-        }
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setFooterState('error');
-        setFooterText(err.detail || err.message || 'ERROR AL CONFIRMAR PANEL SIN ORNAMENTO');
-        playSound('error');
-        setIsProcessing(false);
-      }
-    } catch (e) {
-      console.error(e);
-      setFooterState('error');
-      setFooterText('FALLO AL PROCESAR SOLICITUD');
-      playSound('error');
-      setIsProcessing(false);
-    }
-  };
 
   // Retry DB Pointer Advance
   const handleRetryDatabaseAdvance = async () => {
@@ -721,10 +747,12 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     }
   };
 
+  const isNoOrnament = currentPanel && currentPanel.requiereOrnamento === false;
+
   const stepsConfig = [
-    { number: 1, title: 'QR leído' },
+    { number: 1, title: isNoOrnament ? 'Sin ornamento requerido' : 'QR leído' },
     { number: 2, title: 'Pieza correcta' },
-    { number: 3, title: 'Curado OK' },
+    { number: 3, title: isNoOrnament ? 'Curado N/A' : 'Curado OK' },
     { number: 4, title: 'No duplicado' },
     { number: 5, title: 'Impresión etiqueta' }
   ];
@@ -1035,18 +1063,24 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                   lineHeight: 1.15 
                 }}>
                   {(() => {
-                    if (footerState === 'processing') return 'PROCESANDO CÓDIGO QR...';
+                    if (footerState === 'processing') {
+                      return currentPanel && currentPanel.requiereOrnamento === false
+                        ? 'IMPRIMIENDO KANBAN AUTOMÁTICO...'
+                        : 'PROCESANDO CÓDIGO QR...';
+                    }
                     if (footerState === 'approved') return 'PROCESO COMPLETADO';
                     if (footerState === 'rejected') return (validationResult?.motivoRechazo || 'VALIDACIÓN RECHAZADA');
                     if (footerState === 'error') return footerText;
-                    if (currentPanel && currentPanel.requiereOrnamento === false) return 'ESTE PANEL NO LLEVA ORNAMENTO';
+                    if (currentPanel && currentPanel.requiereOrnamento === false) return 'PANEL SIN ORNAMENTO';
                     return 'ACERQUE EL QR AL ESCÁNER';
                   })()}
                 </span>
                 {footerState === 'approved' && (
                   <span style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.95)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
-                    Esperando avance a la siguiente secuencia en DL02...
+                    {currentPanel && currentPanel.requiereOrnamento === false
+                      ? 'Kanban impreso automáticamente (sin ornamento). Esperando avance en DL02...'
+                      : 'Esperando avance a la siguiente secuencia en DL02...'}
                   </span>
                 )}
               </div>
@@ -1062,11 +1096,19 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
               color: 'rgba(255, 255, 255, 0.95)' 
             }}>
               {(() => {
-                if (footerState === 'processing') return 'Verificando correspondencia, tiempo de curado y duplicidad en base de datos.';
-                if (footerState === 'approved') return 'Kanban impreso correctamente. Pieza validada para ensamble.';
+                if (footerState === 'processing') {
+                  return currentPanel && currentPanel.requiereOrnamento === false
+                    ? 'Generando etiqueta Kanban e imprimiendo en Zebra...'
+                    : 'Verificando correspondencia, tiempo de curado y duplicidad en base de datos.';
+                }
+                if (footerState === 'approved') {
+                  return currentPanel && currentPanel.requiereOrnamento === false
+                    ? 'Kanban impreso automáticamente (este modelo no requiere ornamento). Pieza lista para ensamble.'
+                    : 'Kanban impreso correctamente. Pieza validada para ensamble.';
+                }
                 if (footerState === 'rejected') return `${remainingMinText ? remainingMinText + ' — ' : ''}Presione "Aceptar" abajo o escanee CMD-RESET para reintentar.`;
                 if (footerState === 'error') return 'Verifique la conexión de red o impresora y reintente el proceso.';
-                if (currentPanel && currentPanel.requiereOrnamento === false) return 'Presione "Confirmar Panel Sin Ornamento" o escanee CMD-NO-ORN para avanzar.';
+                if (currentPanel && currentPanel.requiereOrnamento === false) return 'Imprimiendo etiqueta Kanban automáticamente sin requerir escaneo...';
                 return 'El sistema validará automáticamente pieza, curado y duplicado.';
               })()}
             </div>
@@ -1287,11 +1329,6 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
 
           {/* PANEL SIN ORNAMENTO ACTION CARD */}
           <div 
-            onClick={() => {
-              if (currentPanel && currentPanel.requiereOrnamento === false && !isProcessing && footerState !== 'approved') {
-                handleConfirmNoOrnament();
-              }
-            }}
             style={{
               background: currentPanel && currentPanel.requiereOrnamento === false ? '#f0fdf4' : '#ffffff',
               border: `1px solid ${currentPanel && currentPanel.requiereOrnamento === false ? '#86efac' : '#cbd5e1'}`,
@@ -1300,7 +1337,6 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '14px',
-              cursor: currentPanel && currentPanel.requiereOrnamento === false ? 'pointer' : 'default',
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
               transition: 'all 0.2s ease'
             }}
@@ -1312,7 +1348,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
               background: currentPanel && currentPanel.requiereOrnamento === false ? '#dcfce7' : '#f1f5f9', 
               display: 'flex', 
               alignItems: 'center', 
-              justifyContent: 'center',
+              justifyContent: 'center', 
               flexShrink: 0 
             }}>
               <FileText size={20} color={currentPanel && currentPanel.requiereOrnamento === false ? '#15803d' : '#64748b'} />
@@ -1322,8 +1358,10 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
               <span style={{ fontSize: '14px', fontWeight: 900, color: '#0f172a' }}>
                 PANEL SIN ORNAMENTO
               </span>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>
-                Escanee CMD-NO-ORN para avanzar.
+              <span style={{ fontSize: '11px', fontWeight: 600, color: currentPanel && currentPanel.requiereOrnamento === false ? '#15803d' : '#64748b' }}>
+                {currentPanel && currentPanel.requiereOrnamento === false
+                  ? (footerState === 'approved' ? '✓ Kanban impreso automáticamente (sin escaneo).' : 'Imprimiendo Kanban automáticamente...')
+                  : 'Este modelo requiere colocación de ornamento.'}
               </span>
             </div>
           </div>
