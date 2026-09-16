@@ -432,6 +432,11 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       return;
     }
 
+    if (footerState === 'approved') {
+      // Panel ya completado y validado, esperando que avance la secuencia
+      return;
+    }
+
     setLastScannedQr(normalizedQr);
     setShowQrForSeconds(true);
     setTimeout(() => setShowQrForSeconds(false), 5000);
@@ -485,21 +490,8 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           setFooterState('approved');
           setFooterText('PROCESO COMPLETADO');
           playSound('success');
-          
-          // Auto advance in 4s with visual countdown
-          setAutoAdvanceSeconds(4);
-          const interval = setInterval(() => {
-            setAutoAdvanceSeconds((prev) => (prev !== null && prev > 1 ? prev - 1 : null));
-          }, 1000);
-
-          setTimeout(() => {
-            clearInterval(interval);
-            setAutoAdvanceSeconds(null);
-            setValidationResult(null);
-            setLabelPreview(null);
-            setIsProcessing(false);
-          }, 4000);
-
+          setIsProcessing(false);
+          setAutoAdvanceSeconds(null);
         } else {
           playSound('error');
           if (result.validation.motivoRechazo === 'ORNAMENTO YA PROCESADO') {
@@ -596,19 +588,8 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           setFooterState('approved');
           setFooterText('PROCESO COMPLETADO');
           playSound('success');
-
-          setAutoAdvanceSeconds(4);
-          const interval = setInterval(() => {
-            setAutoAdvanceSeconds((prev) => (prev !== null && prev > 1 ? prev - 1 : null));
-          }, 1000);
-
-          setTimeout(() => {
-            clearInterval(interval);
-            setAutoAdvanceSeconds(null);
-            setValidationResult(null);
-            setLabelPreview(null);
-            setIsProcessing(false);
-          }, 4000);
+          setIsProcessing(false);
+          setAutoAdvanceSeconds(null);
         } else {
           playSound('error');
           if (result.message === 'ERROR DE IMPRESIÓN') {
@@ -700,8 +681,8 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       return 'pending';
     }
 
-    const isApprovedNoOrn = footerState === 'approved' && currentPanel?.requiereOrnamento === false;
-    if (isApprovedNoOrn) return 'success';
+    const isFooterApproved = (footerState as string) === 'approved';
+    if (isFooterApproved) return 'success';
 
     if (!validationResult) return 'pending';
 
@@ -733,7 +714,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       case 5: // Impresión etiqueta
         if (!isApproved) return 'pending';
         if (validationResult.estadoImpresion === 'ERROR' || mockPrintFolderError) return 'error';
-        if (validationResult.estadoImpresion === 'COMPLETO') return 'success';
+        if (validationResult.estadoImpresion === 'COMPLETO' || isApproved) return 'success';
         return 'loading';
       default:
         return 'pending';
@@ -1062,9 +1043,10 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                     return 'ACERQUE EL QR AL ESCÁNER';
                   })()}
                 </span>
-                {autoAdvanceSeconds !== null && (
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginTop: '2px' }}>
-                    Avanzando automáticamente en {autoAdvanceSeconds}s...
+                {footerState === 'approved' && (
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.95)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
+                    Esperando avance a la siguiente secuencia en DL02...
                   </span>
                 )}
               </div>
@@ -1201,13 +1183,42 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
             COLUMN 3: VALIDACIÓN AUTOMÁTICA (~30%)
            =================================================================== */}
         <section className="tb-col-right">
-          <div>
-            <h2 style={{ margin: '0 0 2px 0', fontSize: '18px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
-              Validación Automática
-            </h2>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-              El sistema verificará en el siguiente orden:
-            </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ margin: '0 0 2px 0', fontSize: '18px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
+                Validación Automática
+              </h2>
+              <span style={{ 
+                fontSize: '11px', 
+                fontWeight: 800, 
+                color: footerState === 'approved' ? '#15803d' : '#64748b', 
+                letterSpacing: '0.5px', 
+                textTransform: 'uppercase' 
+              }}>
+                {footerState === 'approved' 
+                  ? '✓ Poka-Yoke OK — Esperando siguiente secuencia' 
+                  : 'El sistema verificará en el siguiente orden:'}
+              </span>
+            </div>
+            {footerState === 'approved' && (
+              <span style={{ 
+                background: '#dcfce7', 
+                color: '#15803d', 
+                border: '1px solid #86efac', 
+                padding: '4px 10px', 
+                borderRadius: '6px', 
+                fontSize: '11px', 
+                fontWeight: 900, 
+                letterSpacing: '0.5px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                flexShrink: 0
+              }}>
+                <CheckCircle size={14} color="#15803d" />
+                APROBADO
+              </span>
+            )}
           </div>
 
           {/* 5-STEP CHECKLIST */}
@@ -1247,7 +1258,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                     </div>
 
                     {/* Step Name */}
-                    <span style={{ marginLeft: '14px', fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                    <span className="step-title" style={{ marginLeft: '14px', fontSize: '15px', fontWeight: 800, color: status === 'success' ? '#14532d' : '#0f172a' }}>
                       {step.title}
                     </span>
                   </div>
@@ -1277,7 +1288,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           {/* PANEL SIN ORNAMENTO ACTION CARD */}
           <div 
             onClick={() => {
-              if (currentPanel && currentPanel.requiereOrnamento === false && !isProcessing) {
+              if (currentPanel && currentPanel.requiereOrnamento === false && !isProcessing && footerState !== 'approved') {
                 handleConfirmNoOrnament();
               }
             }}
